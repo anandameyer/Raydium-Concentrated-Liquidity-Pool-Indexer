@@ -1,0 +1,427 @@
+type PoolManager @entity {
+  id: ID!
+  poolCount: Int!
+  swapCount: BigInt!
+
+  # total volume all time in derived USD
+  totalVolumeUSD: Float!
+
+  # total swap fees all time in USD
+  totalFeesUSD: Float!
+
+  poolManagerAddress: String!
+  chainId: Int!
+}
+
+type Bundle @entity {
+  id: ID!
+  nativePriceUSD: Float!
+  chainId: Int!
+}
+
+type Wallet @entity {
+  "User address"
+  id: ID!
+
+  walletAddress: String!
+  chainId: Int!
+
+  positions: [Position!]! @derivedFrom(field: "owner")
+}
+
+type Position @entity {
+  " Position Manager + NFT ID "
+  id: ID!
+
+  " id of the non fungible position "
+  nftId: BigInt!
+
+  " lower tick of the position "
+  lowerTick: Int!
+
+  " upper tick of the position "
+  upperTick: Int!
+
+  " total position liquidity "
+  liquidity: BigInt!
+
+  " amount of token0 stored in the position "
+  amount0: BigInt!
+  amount0D: String!
+
+  " amount of token1 stored in the position "
+  amount1: BigInt!
+  amount1D: String!
+
+  token0Id: ID
+  " currency0 address "
+  token0: Token
+
+  token1Id: ID
+  " currency1 address "
+  token1: Token
+
+  coreTotalUSD: Float!
+
+  managerId: ID!
+  manager: Manager!
+
+  poolId: ID
+  pool: Pool
+
+  ownerId: ID!
+  owner: Wallet!
+
+  ratio: Float!
+
+  chainId: Int!
+
+  "last update block "
+  blockNumber: BigInt!
+
+  "last update timestamp "
+  timestamp: BigInt!
+}
+
+type Token @entity {
+  id: ID!
+
+  name: String!
+
+  symbol: String!
+
+  decimals: Int!
+
+  price: Float!
+
+  # number of pools containing this token
+  poolCount: Int!
+
+  swapCount: BigInt!
+
+  chainId: Int!
+  tokenAddress: String!
+
+  blockNumber: BigInt!
+  timestamp: BigInt!
+
+  tokenDayDatas: [TokenDayData!]! @derivedFrom(field: "token")
+  tokenHourDatas: [TokenHourData!]! @derivedFrom(field: "token")
+}
+
+type Hook @entity {
+  ## Smart contract address of the token
+  id: ID!
+
+  isWhitelisted: Boolean!
+  isBlacklisted: Boolean!
+
+  chainId: Int!
+  hookAddress: String!
+
+  ## last update block
+  blockNumber: BigInt!
+
+  ## last update timestamp
+  timestamp: BigInt!
+}
+
+type Pool @entity {
+  " poolId "
+  id: ID!
+
+  token0Id: ID!
+  " currency0 address "
+  token0: Token!
+
+  token1Id: ID!
+  " currency1 address "
+  token1: Token!
+
+  token0Decimals: Int!
+  token1Decimals: Int!
+
+  " amount of token0 stored in the pool "
+  amount0: BigInt!
+  amount0D: String!
+
+  " amount of token1 stored in the pool "
+  amount1: BigInt!
+  amount1D: String!
+
+  " relative price of token0"
+  price0: Float!
+
+  " relative price of token1"
+  price1: Float!
+
+  poolAddress: String!
+
+  " pool fee tier "
+  fee: Int!
+
+  hookId: ID!
+  hook: Hook!
+
+  " sqrtPriceX96, used for calculations "
+  sqrtPriceX96: BigInt!
+
+  " current pool tick "
+  currentTick: Int!
+
+  liquidity: BigInt!
+
+  volumeToken0: BigInt!
+  volumeToken0D: String!
+
+  volumeToken1: BigInt!
+  volumeToken1D: String!
+
+  volumeUSD: Float!
+
+  collectedFeesToken0: BigInt!
+  collectedFeesToken1: BigInt!
+
+  # all time fees collected derived USD
+  collectedFeesUSD: Float!
+
+  tvlUSD: Float!
+
+  tickSpacing: Int!
+  batchBlockMinimumTick: Int!
+  batchBlockMaximumTick: Int!
+
+  swapCount: BigInt!
+
+  chainId: Int!
+
+  "last update block "
+  blockNumber: BigInt!
+
+  "last update timestamp "
+  timestamp: BigInt!
+
+  # creation
+  createdAtTimestamp: BigInt!
+  # block pool was created at
+  createdAtBlockNumber: BigInt!
+
+  positions: [Position!]! @derivedFrom(field: "pool")
+  poolDayDatas: [PoolDayData!]! @derivedFrom(field: "pool")
+  poolHourDatas: [PoolHourData!]! @derivedFrom(field: "pool")
+}
+
+type Manager @entity {
+  " position manager address "
+  id: ID!
+
+  managerAddress: String!
+  chainId: Int!
+
+  positions: [Position]! @derivedFrom(field: "manager")
+}
+
+type PoolDayData @entity {
+  id: ID!
+
+  # timestamp rounded to current day by dividing by 86400
+  date: DateTime!
+
+  poolId: ID!
+  pool: Pool!
+
+  # in range liquidity at end of period
+  liquidity: BigInt!
+  # current price tracker at end of period
+  sqrtPrice: BigInt!
+
+  # current tick at end of period
+  tick: Int!
+
+  # volume in token0
+  volumeToken0: BigInt!
+  volumeToken0D: String!
+  # volume in token1
+  volumeToken1: BigInt!
+  volumeToken1D: String!
+
+  # volume in USD
+  volumeUSD: Float!
+
+  # percentage change in volume USD compared to previous day
+  volumePercentageChange: Float!
+
+  collectedFeesToken0: BigInt!
+  collectedFeesToken1: BigInt!
+
+  # all time fees collected derived USD
+  collectedFeesUSD: Float!
+
+  swapCount: BigInt!
+
+  # opening price of token0
+  open: Float!
+  # high price of token0
+  high: Float!
+  # low price of token0
+  low: Float!
+  # close price of token0
+  close: Float!
+
+  chainId: Int!
+}
+
+type PoolHourData @entity {
+  id: ID!
+
+  # unix timestamp for start of hou
+  date: DateTime!
+
+  poolId: ID!
+  pool: Pool!
+
+  # in range liquidity at end of period
+  liquidity: BigInt!
+  # current price tracker at end of period
+  sqrtPrice: BigInt!
+
+  # current tick at end of period
+  tick: Int!
+
+  # volume in token0
+  volumeToken0: BigInt!
+  # volume in token0 decimal
+  volumeToken0D: String!
+  # volume in token1
+  volumeToken1: BigInt!
+  # volume in token1 decimal
+  volumeToken1D: String!
+
+  # volume in USD
+  volumeUSD: Float!
+
+  # percentage change in volume USD compared to previous hour
+  volumePercentageChange: Float!
+
+  collectedFeesToken0: BigInt!
+  collectedFeesToken1: BigInt!
+
+  # all time fees collected derived USD
+  collectedFeesUSD: Float!
+
+  swapCount: BigInt!
+
+  # opening price of token0
+  open: Float!
+  # high price of token0
+  high: Float!
+  # low price of token0
+  low: Float!
+  # close price of token0
+  close: Float!
+
+  chainId: Int!
+}
+
+type ModifyLiquidityReccord @entity {
+  id: ID!
+  poolId: String!
+  poolEntityId: ID!
+  poolEntity: Pool!
+  liquidityDelta: BigInt!
+  salt: String!
+  senderId: ID!
+  sender: Wallet!
+  tickLower: Int!
+  tickUpper: Int!
+
+  hash: String!
+  # creation
+  txAtTimestamp: BigInt!
+  # block pool was created at
+  txAtBlockNumber: BigInt!
+}
+
+type SwapReccord @entity {
+  id: ID!
+
+  poolId: String!
+  poolEntityId: ID!
+  poolEntity: Pool!
+  amount0: BigInt!
+  amount1: BigInt!
+  fee: Int!
+  liquidity: BigInt!
+  senderId: ID!
+  sender: Wallet!
+  sqrtPriceX96: BigInt!
+  tick: Int!
+
+  hash: String!
+  # creation
+  txAtTimestamp: BigInt!
+  # block pool was created at
+  txAtBlockNumber: BigInt!
+}
+
+type DonateReccord @entity {
+  id: ID!
+
+  poolId: String!
+  poolEntityId: ID!
+  poolEntity: Pool!
+  amount0: BigInt!
+  amount1: BigInt!
+
+  senderId: ID!
+  sender: Wallet!
+  hash: String!
+  # creation
+  txAtTimestamp: BigInt!
+  # block pool was created at
+  txAtBlockNumber: BigInt!
+}
+
+type TokenDayData @entity {
+  id: ID!
+  # timestamp rounded to current day by dividing by 86400
+  date: DateTime!
+
+  tokenId: ID!
+  token: Token!
+
+  swapCount: BigInt!
+
+  # opening price USD
+  open: Float!
+  # high price USD
+  high: Float!
+  # low price USD
+  low: Float!
+  # close price USD
+  close: Float!
+
+  chainId: Int!
+}
+
+type TokenHourData @entity {
+  id: ID!
+  # timestamp rounded to current day by dividing by 86400
+  date: DateTime!
+
+  tokenId: ID!
+  token: Token!
+
+  swapCount: BigInt!
+
+  # opening price USD
+  open: Float!
+  # high price USD
+  high: Float!
+  # low price USD
+  low: Float!
+  # close price USD
+  close: Float!
+
+  chainId: Int!
+}
