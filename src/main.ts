@@ -146,6 +146,15 @@ function bigIntPercentage(value: bigint, percentage: number, precision: number):
     return result;
 }
 
+function divideBigIntToFloat(numerator: bigint, denominator: bigint, precision: number = 18): number {
+    if (denominator === 0n) {
+        return 0.0;
+    }
+    const scaledNumerator = numerator * 10n ** BigInt(precision);
+    const result = scaledNumerator / denominator;
+    return Number(result) / 10 ** precision;
+}
+
 function getCreatePositionEvent(logs: LogMessage[]): CreatePersonalPosition | undefined {
     for (let log of logs) {
         try {
@@ -445,7 +454,7 @@ run(dataSource, database, async ctx => {
                                 newPosition.liquidity = event.liquidity;
                                 newPosition.amount0 = event.depositAmount0;
                                 newPosition.amount1 = event.depositAmount1;
-                                newPosition.ratio = Number(event.depositAmount0 / event.depositAmount1);
+                                newPosition.ratio = divideBigIntToFloat(newPosition.amount0, newPosition.amount1);
                                 pool.liquidity += event.liquidity;
                                 pool.amount0 += event.depositAmount0;
                                 pool.amount1 += event.depositAmount1;
@@ -585,7 +594,7 @@ run(dataSource, database, async ctx => {
                                 position.liquidity = event.liquidity;
                                 position.amount0 += event.amount0;
                                 position.amount1 += event.amount1;
-                                position.ratio = Number(position.amount0 / position.amount1);
+                                position.ratio = divideBigIntToFloat(position.amount0, position.amount1);
                                 pool.liquidity += event.liquidity;
                                 pool.amount0 += event.amount0;
                                 pool.amount1 += event.amount1;
@@ -616,7 +625,7 @@ run(dataSource, database, async ctx => {
                                 position.liquidity = event.liquidity;
                                 position.amount0 -= event.decreaseAmount0;
                                 position.amount1 -= event.decreaseAmount1;
-                                position.ratio = Number(position.amount0 / position.amount1);
+                                position.ratio = divideBigIntToFloat(position.amount0, position.amount1);
                                 pool.liquidity -= event.liquidity;
                                 pool.amount0 -= event.decreaseAmount0;
                                 pool.amount1 -= event.decreaseAmount1;
