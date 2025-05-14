@@ -43,7 +43,21 @@ export class TokenStore {
             })
         }
 
-        return new Token();
+        return new Token({
+            id: mintAddress,
+            name: '',
+            symbol: '',
+            decimals: 0,
+            price: 0,
+            poolCount: 0,
+            swapCount: 0n,
+            chainId: 0,
+            tokenAddress: mintAddress,
+            blockNumber: 0n,
+            timestamp: 0n,
+            // tokenDayDatas: [],
+            // tokenHourDatas: []
+        });
     }
 
     async ensure(id: string): Promise<Token> {

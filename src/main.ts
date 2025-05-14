@@ -380,7 +380,7 @@ run(dataSource, database, async ctx => {
 
                         token0.poolCount += 1;
                         token1.poolCount += 1;
-                        await pairRecordStore.insert(newPool.id, newPool.token0Id, newPool.token1Id, new Date(inst.block.timestamp), params.data.sqrtPriceX64);
+                        await pairRecordStore.insert(params.accounts.poolState, params.accounts.tokenMint0, params.accounts.tokenMint1, new Date(inst.block.timestamp), params.data.sqrtPriceX64);
                         await tokenStore.save(token0, token1);
                         await walletStore.ensure(params.accounts.poolCreator);
                         await poolStore.save(newPool);
