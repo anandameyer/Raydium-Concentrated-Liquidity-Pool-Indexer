@@ -380,7 +380,7 @@ run(dataSource, database, async ctx => {
 
                         token0.poolCount += 1;
                         token1.poolCount += 1;
-                        await pairRecordStore.insert(params.accounts.poolState, params.accounts.tokenMint0, params.accounts.tokenMint1, new Date(inst.block.timestamp), params.data.sqrtPriceX64);
+                        await pairRecordStore.insert(params.accounts.poolState, params.accounts.tokenMint0, params.accounts.tokenMint1, new Date(inst.block.timestamp * 1000), params.data.sqrtPriceX64);
                         await tokenStore.save(token0, token1);
                         await walletStore.ensure(params.accounts.poolCreator);
                         await poolStore.save(newPool);
@@ -678,7 +678,7 @@ run(dataSource, database, async ctx => {
                     const event = SwapEvent.decodeData(base64.decode(log.message));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
-                        pairRecordStore.insert(pool.id, pool.token0Id, pool.token1Id, new Date(log.block.timestamp), event.sqrtPriceX64);
+                        pairRecordStore.insert(pool.id, pool.token0Id, pool.token1Id, new Date(log.block.timestamp * 1000), event.sqrtPriceX64);
                         pool.liquidity = event.liquidity;
                         await poolStore.save(pool);
 

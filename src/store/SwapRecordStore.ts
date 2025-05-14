@@ -29,9 +29,9 @@ export class SwapRecordStore {
     }
 
     private async getTokenHourBefore(token: string, timestamp: number): Promise<TokenHourData | undefined> {
-        const startOfDay = new Date(timestamp);
+        const startOfDay = new Date(timestamp * 1000);
         startOfDay.setHours(0, 0, 0, 0);
-        const hourBefore = new Date(timestamp);
+        const hourBefore = new Date(timestamp * 1000);
         hourBefore.setHours(hourBefore.getHours() - 1, 0, 0, 0);
 
         const id = `${token}-${startOfDay.getTime() + hourBefore.getTime()}`;
@@ -53,7 +53,7 @@ export class SwapRecordStore {
 
 
     private async getTokenDayBefore(token: string, timestamp: number): Promise<TokenDayData | undefined> {
-        const dayBefore = new Date(timestamp);
+        const dayBefore = new Date(timestamp * 1000);
         dayBefore.setDate(dayBefore.getDate() - 1);
         dayBefore.setHours(0, 0, 0, 0);
 
@@ -67,9 +67,9 @@ export class SwapRecordStore {
     }
 
     async record(recordId: string, signature: string, pool: Pool, token0: Token, token1: Token, sender: Wallet, event: SwapEvent, block: Block): Promise<Token> {
-        const startOfDay = new Date(block.timestamp);
+        const startOfDay = new Date(block.timestamp * 1000);
         startOfDay.setHours(0, 0, 0, 0);
-        const startOfHour = new Date(block.timestamp);
+        const startOfHour = new Date(block.timestamp * 1000);
         startOfHour.setMinutes(0, 0, 0);
 
 
@@ -101,7 +101,7 @@ export class SwapRecordStore {
         if (!tokenHour) {
             tokenHour = new TokenHourData({
                 id: tokenHourId,
-                date: new Date(block.timestamp),
+                date: new Date(block.timestamp * 1000),
                 tokenId: token.id,
                 token: token,
                 swapCount: 1n,
@@ -130,7 +130,7 @@ export class SwapRecordStore {
         if (!tokenDay) {
             tokenDay = new TokenDayData({
                 id: tokenDayId,
-                date: new Date(block.timestamp),
+                date: new Date(block.timestamp * 1000),
                 tokenId: token.id,
                 token: token,
                 swapCount: 1n,
