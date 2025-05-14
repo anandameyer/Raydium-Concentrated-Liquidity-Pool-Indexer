@@ -10,6 +10,8 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
     "@metaplex-foundation/js": "^0.20.1",
+    "@solana/addresses": "^2.1.1",
+    "@solana/codecs": "^2.1.1",
     "@solana/spl-token": "^0.4.12",
     "@solana/web3.js": "1",
     "@subsquid/batch-processor": "^0.0.0",

@@ -1528,12 +1528,30 @@
     "@solana/codecs-strings" "2.0.0"
     "@solana/errors" "2.0.0"
 
+"@solana/addresses@^2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/addresses/-/addresses-2.1.1.tgz#d80710df8da5e695ef52f815fb128d76700c0bea"
+  integrity sha512-yX6+brBXFmirxXDJCBDNKDYbGZHMZHaZS4NJWZs31DTe5To3Ky3Y9g3wFEGAX242kfNyJcgg5OeoBuZ7vdFycQ==
+  dependencies:
+    "@solana/assertions" "2.1.1"
+    "@solana/codecs-core" "2.1.1"
+    "@solana/codecs-strings" "2.1.1"
+    "@solana/errors" "2.1.1"
+    "@solana/nominal-types" "2.1.1"
+
 "@solana/assertions@2.0.0":
   version "2.0.0"
   resolved "https://registry.npmjs.org/@solana/assertions/-/assertions-2.0.0.tgz"
   integrity sha512-NyPPqZRNGXs/GAjfgsw7YS6vCTXWt4ibXveS+ciy5sdmp/0v3pA6DlzYjleF9Sljrew0IiON15rjaXamhDxYfQ==
   dependencies:
     "@solana/errors" "2.0.0"
+
+"@solana/assertions@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/assertions/-/assertions-2.1.1.tgz#55caec1c4c1bfc46958681b38308956274d65680"
+  integrity sha512-ln6dXkliyb9ybqLGFf5Gn+LJaPZGmer9KloIFfHiiSfYFdoAqOu6+pVY+323SKWXHG+hHl9VkwuZYpSp02OroA==
+  dependencies:
+    "@solana/errors" "2.1.1"
 
 "@solana/buffer-layout-utils@^0.2.0":
   version "0.2.0"
@@ -1573,6 +1591,13 @@
   dependencies:
     "@solana/errors" "2.1.0"
 
+"@solana/codecs-core@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/codecs-core/-/codecs-core-2.1.1.tgz#5d09d7f35b0266789d7c1f9306c08051128a6a64"
+  integrity sha512-iPQW3UZ2Vi7QFBo2r9tw0NubtH8EdrhhmZulx6lC8V5a+qjaxovtM/q/UW2BTNpqqHLfO0tIcLyBLrNH4HTWPg==
+  dependencies:
+    "@solana/errors" "2.1.1"
+
 "@solana/codecs-data-structures@2.0.0-rc.1":
   version "2.0.0-rc.1"
   resolved "https://registry.npmjs.org/@solana/codecs-data-structures/-/codecs-data-structures-2.0.0-rc.1.tgz"
@@ -1581,6 +1606,15 @@
     "@solana/codecs-core" "2.0.0-rc.1"
     "@solana/codecs-numbers" "2.0.0-rc.1"
     "@solana/errors" "2.0.0-rc.1"
+
+"@solana/codecs-data-structures@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/codecs-data-structures/-/codecs-data-structures-2.1.1.tgz#681dd189e1cc74e36ad72b00b7d6eb7fa4a244b4"
+  integrity sha512-OcR7FIhWDFqg6gEslbs2GVKeDstGcSDpkZo9SeV4bm2RLd1EZfxGhWW+yHZfHqOZiIkw9w+aY45bFgKrsLQmFw==
+  dependencies:
+    "@solana/codecs-core" "2.1.1"
+    "@solana/codecs-numbers" "2.1.1"
+    "@solana/errors" "2.1.1"
 
 "@solana/codecs-numbers@2.0.0":
   version "2.0.0"
@@ -1597,6 +1631,14 @@
   dependencies:
     "@solana/codecs-core" "2.0.0-rc.1"
     "@solana/errors" "2.0.0-rc.1"
+
+"@solana/codecs-numbers@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/codecs-numbers/-/codecs-numbers-2.1.1.tgz#b7a69024e2397e236bbfb11b75ff4a077236b9d2"
+  integrity sha512-m20IUPJhPUmPkHSlZ2iMAjJ7PaYUvlMtFhCQYzm9BEBSI6OCvXTG3GAPpAnSGRBfg5y+QNqqmKn4QHU3B6zzCQ==
+  dependencies:
+    "@solana/codecs-core" "2.1.1"
+    "@solana/errors" "2.1.1"
 
 "@solana/codecs-numbers@^2.1.0":
   version "2.1.0"
@@ -1624,6 +1666,15 @@
     "@solana/codecs-numbers" "2.0.0-rc.1"
     "@solana/errors" "2.0.0-rc.1"
 
+"@solana/codecs-strings@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/codecs-strings/-/codecs-strings-2.1.1.tgz#cc468501e4e2c0d881cf059796dd4b50c09e3063"
+  integrity sha512-uhj+A7eT6IJn4nuoX8jDdvZa7pjyZyN+k64EZ8+aUtJGt5Ft4NjRM8Jl5LljwYBWKQCgouVuigZHtTO2yAWExA==
+  dependencies:
+    "@solana/codecs-core" "2.1.1"
+    "@solana/codecs-numbers" "2.1.1"
+    "@solana/errors" "2.1.1"
+
 "@solana/codecs@2.0.0-rc.1":
   version "2.0.0-rc.1"
   resolved "https://registry.npmjs.org/@solana/codecs/-/codecs-2.0.0-rc.1.tgz"
@@ -1634,6 +1685,17 @@
     "@solana/codecs-numbers" "2.0.0-rc.1"
     "@solana/codecs-strings" "2.0.0-rc.1"
     "@solana/options" "2.0.0-rc.1"
+
+"@solana/codecs@^2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/codecs/-/codecs-2.1.1.tgz#c06eb7ff710895e75235914f2df018b6b6ab38f9"
+  integrity sha512-89Fv22fZ5dNiXjOKh6I3U1D/lVO/dF/cPHexdiqjS5k5R5uKeK3506rhcnc4ciawQAoOkDwHzW+HitUumF2PJg==
+  dependencies:
+    "@solana/codecs-core" "2.1.1"
+    "@solana/codecs-data-structures" "2.1.1"
+    "@solana/codecs-numbers" "2.1.1"
+    "@solana/codecs-strings" "2.1.1"
+    "@solana/options" "2.1.1"
 
 "@solana/errors@2.0.0":
   version "2.0.0"
@@ -1659,6 +1721,19 @@
     chalk "^5.3.0"
     commander "^13.1.0"
 
+"@solana/errors@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/errors/-/errors-2.1.1.tgz#009ebf387b0c014a8fc60a59d65757fef942e4fd"
+  integrity sha512-sj6DaWNbSJFvLzT8UZoabMefQUfSW/8tXK7NTiagsDmh+Q87eyQDDC9L3z+mNmx9b6dEf6z660MOIplDD2nfEw==
+  dependencies:
+    chalk "^5.4.1"
+    commander "^13.1.0"
+
+"@solana/nominal-types@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/nominal-types/-/nominal-types-2.1.1.tgz#9b940751a07d206bb97439c58c713db82892895e"
+  integrity sha512-EpdDhuoATsm9bmuduv6yoNm1EKCz2tlq13nAazaVyQvkMBHhVelyT/zq0ruUplQZbl7qyYr5hG7p1SfGgQbgSQ==
+
 "@solana/options@2.0.0-rc.1":
   version "2.0.0-rc.1"
   resolved "https://registry.npmjs.org/@solana/options/-/options-2.0.0-rc.1.tgz"
@@ -1669,6 +1744,17 @@
     "@solana/codecs-numbers" "2.0.0-rc.1"
     "@solana/codecs-strings" "2.0.0-rc.1"
     "@solana/errors" "2.0.0-rc.1"
+
+"@solana/options@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@solana/options/-/options-2.1.1.tgz#844eb50e809fbff5819bec71eb47ba1b125a61fe"
+  integrity sha512-rnEExUGVOAV79kiFUEl/51gmSbBYxlcuw2VPnbAV/q53mIHoTgCwDD576N9A8wFftxaJHQFBdNuKiRrnU/fFHA==
+  dependencies:
+    "@solana/codecs-core" "2.1.1"
+    "@solana/codecs-data-structures" "2.1.1"
+    "@solana/codecs-numbers" "2.1.1"
+    "@solana/codecs-strings" "2.1.1"
+    "@solana/errors" "2.1.1"
 
 "@solana/spl-account-compression@^0.1.4", "@solana/spl-account-compression@^0.1.8":
   version "0.1.10"
@@ -3271,7 +3357,7 @@ chalk@^4.0.2, chalk@^4.1.0, chalk@^4.1.1, chalk@^4.1.2:
     ansi-styles "^4.1.0"
     supports-color "^7.1.0"
 
-chalk@^5.2.0, chalk@^5.3.0:
+chalk@^5.2.0, chalk@^5.3.0, chalk@^5.4.1:
   version "5.4.1"
   resolved "https://registry.npmjs.org/chalk/-/chalk-5.4.1.tgz"
   integrity sha512-zgVZuo2WcZgfUEmsn6eO3kINexW8RAE4maiQ8QNs8CtpPCSyMiYsULR3HQYkm3w8FIA3SberyMJMSldGsW+U3w==

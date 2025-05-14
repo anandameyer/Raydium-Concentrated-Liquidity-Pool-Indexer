@@ -1,6 +1,6 @@
-# serum-investigation
+# Raydium Concentrated Liquidity Pool
 
-This project track fresh wallet created for particular token on solana blockchain.
+This project indexing Raydium Concentrated Liquidity Pool on solana using SQD SDK.
 
 ## About SDK
 
@@ -31,23 +31,17 @@ while providing game changing performance over traditional RPC API.
 
 ```bash
 # Install dependencies
-npm i
+yarn install
 
-# Compile the project
-npx tsc
+# Run migration
+yarn run migration
 
-# Launch Postgres database to store the data
-docker compose up -d
-
-# Apply database migrations to create the target schema
-npx squid-typeorm-migration apply
-
-# Run indexer
-node -r dotenv/config lib/main.js
+# Start indexer
+yarn run dev
 
 # Checkout indexed orders
 docker exec "$(basename "$(pwd)")-db-1" psql -U postgres \
-  -c "SELECT * FROM wallets LIMIT 10"
+  -c "SELECT * FROM pool LIMIT 10"
 ```
 
 
