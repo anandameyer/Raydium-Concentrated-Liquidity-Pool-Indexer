@@ -21,9 +21,10 @@ export class WalletStore {
             id: id,
             walletAddress: id,
             chainId: 0
-        })
+        });
 
         this.temps[id] = newWallet;
+        await this.store.upsert(newWallet);
         return newWallet;
     }
 

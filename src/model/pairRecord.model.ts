@@ -1,4 +1,4 @@
-import { BigIntColumn, BooleanColumn, DateTimeColumn, Entity, Index, PrimaryColumn, StringColumn } from '@subsquid/typeorm-store'
+import { BigIntColumn, BooleanColumn, DateTimeColumn, Entity, Index, IntColumn, PrimaryColumn, StringColumn } from '@subsquid/typeorm-store'
 
 @Entity("pair_records")
 export class PairRecord {
@@ -19,9 +19,15 @@ export class PairRecord {
     @Index()
     token0!: string
 
+    @IntColumn()
+    token0Decimals!: number
+
     @StringColumn()
     @Index()
     token1!: string
+
+    @IntColumn()
+    token1Decimals!: number
 
     @BooleanColumn()
     baseStable!: boolean

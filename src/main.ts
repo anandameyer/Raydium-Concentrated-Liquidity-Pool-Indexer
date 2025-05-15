@@ -15,7 +15,7 @@ import { PositionStore } from './store/PositionStore';
 import { SwapRecordStore } from './store/SwapRecordStore';
 import { TokenStore } from './store/TokenStore';
 import { WalletStore } from './store/WalletStore';
-import { BatchBlockTick, divideBigIntToFloat, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, multiplyBigIntByFloat } from './utility';
+import { BatchBlockTick, bigIntToDecimalStr, divideBigIntToFloat, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, multiplyBigIntByFloat } from './utility';
 
 
 const rpcClient = new Connection(process.env.SOLANA_NODE ?? "https://api.mainnet-beta.solana.com");
@@ -241,14 +241,13 @@ run(dataSource, database, async ctx => {
                             price0: 0,
                             price1: 0,
                             poolAddress: params.accounts.poolState,
-                            // fee: ammConfig.tradeFeeRate / 1000,
                             fee: ammConfig.tradeFeeRate,
                             sqrtPriceX96: params.data.sqrtPriceX64,
                             currentTick: 0,
                             liquidity: 0n,
                             volumeToken0: 0n,
-                            volumeToken0D: '',
-                            volumeToken1D: '',
+                            volumeToken0D: '0',
+                            volumeToken1D: '0',
                             volumeToken1: 0n,
                             volumeUSD: 0,
                             collectedFeesToken0: 0n,
@@ -264,14 +263,11 @@ run(dataSource, database, async ctx => {
                             timestamp: BigInt(inst.block.timestamp),
                             createdAtTimestamp: BigInt(inst.block.timestamp),
                             createdAtBlockNumber: BigInt(inst.block.height),
-                            // positions: Position[],
-                            // poolDayDatas: PoolDayData[],
-                            // poolHourDatas: PoolHourData[]
                         });
 
                         token0.poolCount += 1;
                         token1.poolCount += 1;
-                        await pairRecordStore.insert(params.accounts.poolState, params.accounts.tokenMint0, params.accounts.tokenMint1, new Date(inst.block.timestamp * 1000), params.data.sqrtPriceX64);
+                        await pairRecordStore.insert({ poolId: params.accounts.poolState, token0, token1, timestamp: new Date(inst.block.timestamp * 1000), sqrtPriceX96: params.data.sqrtPriceX64 });
                         await tokenStore.save(token0, token1);
                         await walletStore.ensure(params.accounts.poolCreator);
                         await poolStore.save(newPool);
@@ -335,11 +331,15 @@ run(dataSource, database, async ctx => {
                             if (event) {
                                 newPosition.liquidity = event.liquidity;
                                 newPosition.amount0 = event.depositAmount0;
+                                newPosition.amount0D = bigIntToDecimalStr(newPosition.amount0, token0.decimals);
                                 newPosition.amount1 = event.depositAmount1;
+                                newPosition.amount1D = bigIntToDecimalStr(newPosition.amount1, token1.decimals);
                                 newPosition.ratio = divideBigIntToFloat(newPosition.amount0, newPosition.amount1);
                                 pool.liquidity += event.liquidity;
                                 pool.amount0 += event.depositAmount0;
+                                pool.amount0D = bigIntToDecimalStr(pool.amount0, token0.decimals);
                                 pool.amount1 += event.depositAmount1;
+                                pool.amount1D = bigIntToDecimalStr(pool.amount1, token1.decimals);
                             }
 
                             // if (!owner.positions) owner.positions = [newPosition];
@@ -374,10 +374,14 @@ run(dataSource, database, async ctx => {
                                 position.liquidity = event.liquidity;
                                 position.amount0 += event.amount0;
                                 position.amount1 += event.amount1;
+                                position.amount0D = bigIntToDecimalStr(position.amount0, pool.token0Decimals);
+                                position.amount1D = bigIntToDecimalStr(position.amount1, pool.token1Decimals);
                                 position.ratio = divideBigIntToFloat(position.amount0, position.amount1);
                                 pool.liquidity += event.liquidity;
                                 pool.amount0 += event.amount0;
                                 pool.amount1 += event.amount1;
+                                pool.amount0D = bigIntToDecimalStr(pool.amount0, pool.token0Decimals);
+                                pool.amount1D = bigIntToDecimalStr(pool.amount1, pool.token1Decimals);
                             }
                             await poolStore.save(pool);
                             await positionStore.save(position);
@@ -405,10 +409,14 @@ run(dataSource, database, async ctx => {
                                 position.liquidity = event.liquidity;
                                 position.amount0 -= event.decreaseAmount0;
                                 position.amount1 -= event.decreaseAmount1;
+                                position.amount0D = bigIntToDecimalStr(position.amount0, pool.token0Decimals);
+                                position.amount1D = bigIntToDecimalStr(position.amount1, pool.token1Decimals);
                                 position.ratio = divideBigIntToFloat(position.amount0, position.amount1);
                                 pool.liquidity -= event.liquidity;
                                 pool.amount0 -= event.decreaseAmount0;
                                 pool.amount1 -= event.decreaseAmount1;
+                                pool.amount0D = bigIntToDecimalStr(pool.amount0, pool.token0Decimals);
+                                pool.amount1D = bigIntToDecimalStr(pool.amount1, pool.token1Decimals);
                             }
                             await poolStore.save(pool);
                             await positionStore.save(position);
@@ -455,14 +463,21 @@ run(dataSource, database, async ctx => {
                     const event = SwapEvent.decodeData(base64.decode(log.message));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
-                        pairRecordStore.insert(pool.id, pool.token0Id, pool.token1Id, new Date(log.block.timestamp * 1000), event.sqrtPriceX64);
 
                         const token0 = await tokenStore.ensure(pool.token0Id);
                         const token1 = await tokenStore.ensure(pool.token1Id);
                         const sender = await walletStore.ensure(event.sender);
+
+                        await pairRecordStore.insert({ poolId: pool.id, token0, token1, timestamp: new Date(log.block.timestamp * 1000), sqrtPriceX96: event.sqrtPriceX64 });
+
                         const recordId = `${log.id}-${log.logIndex}`;
 
-                        const token = await swapRecordStore.record(recordId, log.transaction?.signatures[0] ?? '', pool, token0, token1, sender, event, log.block);
+                        await swapRecordStore.record(recordId, log.transaction?.signatures[0] ?? '', pool, token0, token1, sender, event, log.block);
+                        batchBlockTick.insert(pool.id, event.tick);
+                        const collectedFee0 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
+                        const collectedFee1 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
+
+                        const token = event.zeroForOne ? token0 : token1;
 
                         pool.swapCount += 1n;
                         if (event.zeroForOne) {
@@ -473,10 +488,8 @@ run(dataSource, database, async ctx => {
                             pool.amount1 += event.amount1
                         }
 
-                        batchBlockTick.insert(pool.id, event.tick);
-                        const collectedFee0 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
-                        const collectedFee1 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
-
+                        pool.amount0D = bigIntToDecimalStr(pool.amount0, pool.token0Decimals);
+                        pool.amount1D = bigIntToDecimalStr(pool.amount1, pool.token1Decimals);
                         [pool.batchBlockMinimumTick, pool.batchBlockMaximumTick] = batchBlockTick.get(pool.id);
                         pool.collectedFeesToken0 += collectedFee0;
                         pool.collectedFeesToken1 += collectedFee1;
@@ -486,6 +499,8 @@ run(dataSource, database, async ctx => {
                         pool.currentTick = event.tick;
                         pool.volumeToken0 += event.amount0;
                         pool.volumeToken1 += event.amount1;
+                        pool.volumeToken0D = bigIntToDecimalStr(pool.volumeToken0, token0.decimals);
+                        pool.volumeToken1D = bigIntToDecimalStr(pool.volumeToken1, token1.decimals);
                         pool.timestamp = BigInt(log.block.timestamp);
                         pool.blockNumber = BigInt(log.block.height);
                         pool.liquidity = event.liquidity;

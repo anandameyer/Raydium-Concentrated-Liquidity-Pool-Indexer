@@ -1,7 +1,7 @@
 import { Store } from "@subsquid/typeorm-store";
 import { SwapEvent } from "../abi/generated/amm_v3/types";
 import { Pool, PoolDayData, PoolHourData, SwapReccord, Token, TokenDayData, TokenHourData, Wallet } from "../model";
-import { divideBigIntToFloat, multiplyBigIntByFloat } from "../utility";
+import { bigIntToDecimalStr, divideBigIntToFloat, multiplyBigIntByFloat } from "../utility";
 import { PairRecordStore } from "./PairRecordStore";
 
 interface Block {
@@ -55,13 +55,13 @@ export class SwapRecordStore {
         return data;
     }
 
-    async record(recordId: string, signature: string, pool: Pool, token0: Token, token1: Token, sender: Wallet, event: SwapEvent, block: Block): Promise<Token> {
+    async record(recordId: string, signature: string, pool: Pool, token0: Token, token1: Token, sender: Wallet, event: SwapEvent, block: Block): Promise<void> {
+
         const timestamp = new Date(block.timestamp * 1000);
         const startOfDay = new Date(block.timestamp * 1000);
         startOfDay.setHours(0, 0, 0, 0);
         const startOfHour = new Date(block.timestamp * 1000);
         startOfHour.setMinutes(0, 0, 0);
-
 
         this.swapRecords.push(new SwapReccord({
             id: recordId,
@@ -81,7 +81,14 @@ export class SwapRecordStore {
             txAtBlockNumber: BigInt(block.height)
         }));
 
-        const token = event.zeroForOne ? token1 : token0;
+        await this.recordTokenData(token0, timestamp, startOfDay, startOfHour);
+        await this.recordTokenData(token1, timestamp, startOfDay, startOfHour);
+        await this.recordPoolData(pool, token0, token1, event, block);
+
+    }
+
+    private async recordTokenData(token: Token, timestamp: Date, startOfDay: Date, startOfHour: Date): Promise<void> {
+
         token.swapCount += 1n;
         const tokenHourId = `${token.id}-${startOfDay.getTime() + startOfHour.getTime()}`
 
@@ -132,8 +139,18 @@ export class SwapRecordStore {
             if (fetchedPrice < tokenDay.low) tokenDay.low = fetchedPrice;
             tokenDay.close = fetchedPrice;
         }
-        this.tokenDays[tokenDayId] = tokenDay;
 
+        this.tokenDays[tokenDayId] = tokenDay;
+    }
+
+    private async recordPoolData(pool: Pool, token0: Token, token1: Token, event: SwapEvent, block: Block): Promise<void> {
+        const timestamp = new Date(block.timestamp * 1000);
+        const startOfDay = new Date(block.timestamp * 1000);
+        startOfDay.setHours(0, 0, 0, 0);
+        const startOfHour = new Date(block.timestamp * 1000);
+        startOfHour.setMinutes(0, 0, 0);
+
+        const fetchedPrice = await this.pairRecordStore.getPrice(token1.id);
 
         const collectedFee0 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
         const collectedFee1 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
@@ -151,9 +168,9 @@ export class SwapRecordStore {
                 sqrtPrice: event.sqrtPriceX64,
                 tick: event.tick,
                 volumeToken0: event.amount0,
-                volumeToken0D: '0',
+                volumeToken0D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeToken1: event.amount1,
-                volumeToken1D: '0',
+                volumeToken1D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeUSD: Number(multiplyBigIntByFloat(event.amount0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(event.amount1, await this.pairRecordStore.getPrice(token1.id), 6)),
                 volumePercentageChange: 0,
                 collectedFeesToken0: collectedFee0,
@@ -174,6 +191,8 @@ export class SwapRecordStore {
             poolHour.volumePercentageChange = divideBigIntToFloat((pool.volumeToken0 + pool.volumeToken1), (event.amount0 + event.amount1));
             poolHour.volumeToken0 += event.amount0;
             poolHour.volumeToken1 += event.amount1;
+            poolHour.volumeToken0D = bigIntToDecimalStr(poolHour.volumeToken0, token0.decimals);
+            poolHour.volumeToken1D = bigIntToDecimalStr(poolHour.volumeToken1, token1.decimals);
             poolHour.collectedFeesToken0 += collectedFee0;
             poolHour.collectedFeesToken1 += collectedFee1;
             poolHour.collectedFeesUSD += Number(multiplyBigIntByFloat(collectedFee0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(collectedFee1, await this.pairRecordStore.getPrice(token1.id), 6));
@@ -196,9 +215,9 @@ export class SwapRecordStore {
                 sqrtPrice: event.sqrtPriceX64,
                 tick: event.tick,
                 volumeToken0: event.amount0,
-                volumeToken0D: '0',
+                volumeToken0D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeToken1: event.amount1,
-                volumeToken1D: '0',
+                volumeToken1D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeUSD: Number(multiplyBigIntByFloat(event.amount0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(event.amount1, await this.pairRecordStore.getPrice(token1.id), 6)),
                 volumePercentageChange: 0,
                 collectedFeesToken0: collectedFee0,
@@ -219,6 +238,8 @@ export class SwapRecordStore {
             poolDay.volumePercentageChange = divideBigIntToFloat((pool.volumeToken0 + pool.volumeToken1), (event.amount0 + event.amount1));
             poolDay.volumeToken0 += event.amount0;
             poolDay.volumeToken1 += event.amount1;
+            poolDay.volumeToken0D = bigIntToDecimalStr(poolHour.volumeToken0, token0.decimals);
+            poolDay.volumeToken1D = bigIntToDecimalStr(poolHour.volumeToken1, token1.decimals);
             poolDay.collectedFeesToken0 += collectedFee0;
             poolDay.collectedFeesToken1 += collectedFee1;
             poolDay.collectedFeesUSD += Number(multiplyBigIntByFloat(collectedFee0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(collectedFee1, await this.pairRecordStore.getPrice(token1.id), 6));
@@ -228,8 +249,6 @@ export class SwapRecordStore {
             poolDay.close = fetchedPrice;
         }
         this.poolDays[poolDayId] = poolDay;
-
-        return token;
     }
 
 

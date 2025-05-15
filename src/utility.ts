@@ -3,6 +3,20 @@ import { LogMessage } from "@subsquid/solana-stream";
 import { CollectPersonalFeeEvent, CollectProtocolFeeEvent, CreatePersonalPositionEvent, DecreaseLiquidityEvent, IncreaseLiquidityEvent } from './abi/generated/amm_v3/events';
 import { CollectPersonalFeeEvent as CollectPersonalFee, CreatePersonalPositionEvent as CreatePersonalPosition, DecreaseLiquidityEvent as DecreaseLiquidity, IncreaseLiquidityEvent as IncreaseLiquidity, CollectProtocolFeeEvent as ProtocolFeeEvent } from './abi/generated/amm_v3/types';
 
+export function bigIntToDecimalStr(value: bigint, decimals: number = 9, trimTrailingZeros: boolean = true): string {
+
+    if (decimals < 0) throw new Error("Decimals cannot be negative");
+
+    const str = value.toString().padStart(decimals + 1, '0');
+    const integerPart = str.slice(0, -decimals) || '0';
+    const fractionalPart = str.slice(-decimals);
+
+    let result = fractionalPart ? `${integerPart}.${fractionalPart}` : integerPart;
+
+    if (trimTrailingZeros && fractionalPart) result = result.replace(/\.?0+$/, '');
+    return result;
+}
+
 export function divideBigIntToFloat(numerator: bigint, denominator: bigint, maxDecimals: number = 15): number {
     if (denominator === 0n) return 0.0;
     const fullPrecision = Number(numerator) / Number(denominator);

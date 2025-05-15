@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Store } from "@subsquid/typeorm-store";
 import { PoolState } from "../abi/pool";
-import { PairRecord } from "../model";
+import { PairRecord, Token } from "../model";
 import { TokenStore } from "./TokenStore";
 
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
@@ -12,12 +12,21 @@ function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function getPriceFromSqrtPriceX96(sqrtPriceX96: bigint | string): number {
+export interface InsertParam {
+    poolId: string
+    token0: Token
+    token1: Token
+    timestamp: Date
+    sqrtPriceX96: bigint
+}
+
+export function getPriceFromSqrtPriceX96(sqrtPriceX96: bigint | string, decimalsBase: number, decimalsQuote: number): number {
     const sqrtPrice = BigInt(sqrtPriceX96);
-    const sqrtPriceSquared = sqrtPrice * sqrtPrice;
+    const numerator = sqrtPrice * sqrtPrice;
     const denominator = 2n ** 192n;
-    const priceRatio = Number(sqrtPriceSquared) / Number(denominator);
-    return priceRatio;
+    const priceRatio = Number(numerator) / Number(denominator);
+    const decimalAdjustment = 10 ** (decimalsBase - decimalsQuote);
+    return priceRatio * decimalAdjustment;
 }
 
 export class PairRecordStore {
@@ -66,42 +75,44 @@ export class PairRecordStore {
         return pair;
     }
 
-    async withPoolFetch(poolId: string, timestamp: Date, sqrtPriceX96: bigint) {
-        let token0: string | undefined = undefined;
-        let token1: string | undefined = undefined;
-        const pair = await this.getByPoolId(poolId);
-        if (pair) {
-            [token0, token1] = [pair.token0, pair.token1];
-        } else {
-            const pool = await this.fetchPool(poolId);
-            if (pool) [token0, token1] = [pool.tokenMint0, pool.tokenMint1]
-        }
+    // async withPoolFetch(poolId: string, timestamp: Date, sqrtPriceX96: bigint) {
+    //     let token0: string | undefined = undefined;
+    //     let token1: string | undefined = undefined;
+    //     const pair = await this.getByPoolId(poolId);
+    //     if (pair) {
+    //         [token0, token1] = [pair.token0, pair.token1];
+    //     } else {
+    //         const pool = await this.fetchPool(poolId);
+    //         if (pool) [token0, token1] = [pool.tokenMint0, pool.tokenMint1]
+    //     }
 
 
-        if (token0 && token1) {
-            const newPair = new PairRecord({
-                id: `${token0}-${token1}-${timestamp.getTime()}`,
-                poolId: poolId,
-                timestamp: timestamp,
-                token0: token0,
-                token1: token1,
-                baseStable: token0 === USDC || token0 === USDT,
-                sqrtPriceX96: sqrtPriceX96
-            });
+    //     if (token0 && token1) {
+    //         const newPair = new PairRecord({
+    //             id: `${token0}-${token1}-${timestamp.getTime()}`,
+    //             poolId: poolId,
+    //             timestamp: timestamp,
+    //             token0: token0,
+    //             token1: token1,
+    //             baseStable: token0 === USDC || token0 === USDT,
+    //             sqrtPriceX96: sqrtPriceX96
+    //         });
 
-            this.temps[newPair.id] = newPair;
-            await this.store.upsert(newPair);
-        }
-    }
+    //         this.temps[newPair.id] = newPair;
+    //         await this.store.upsert(newPair);
+    //     }
+    // }
 
-    async insert(poolId: string, token0: string, token1: string, timestamp: Date, sqrtPriceX96: bigint) {
+    async insert({ poolId, token0, token1, timestamp, sqrtPriceX96 }: InsertParam) {
         const newPair = new PairRecord({
-            id: `${token0}-${token1}-${timestamp.getTime()}`,
+            id: `${token0.id}-${token1.id}-${timestamp.getTime()}`,
             poolId: poolId,
             timestamp: timestamp,
-            token0: token0,
-            token1: token1,
-            baseStable: token0 === USDC || token0 === USDT,
+            token0: token0.id,
+            token1: token1.id,
+            token0Decimals: token0.decimals,
+            token1Decimals: token1.decimals,
+            baseStable: token0.id === USDC || token0.id === USDT,
             sqrtPriceX96: sqrtPriceX96
         });
 
@@ -119,7 +130,7 @@ export class PairRecordStore {
 
         const stableBackup = await this.getStablePairByToken1(token);
         if (stableBackup) {
-            const price = getPriceFromSqrtPriceX96(stableBackup.sqrtPriceX96);
+            const price = getPriceFromSqrtPriceX96(stableBackup.sqrtPriceX96, stableBackup.token0Decimals, stableBackup.token1Decimals);
             const fetchedToken = await this.tokenStore.ensure(token);
             if (fetchedToken) fetchedToken.price = price;
             return price;
@@ -136,7 +147,7 @@ export class PairRecordStore {
 
                 const stablePair = await this.getStablePairByToken1(pair.token1);
                 if (stablePair) {
-                    const price = getPriceFromSqrtPriceX96(pair.sqrtPriceX96) * getPriceFromSqrtPriceX96(stablePair.sqrtPriceX96);
+                    const price = getPriceFromSqrtPriceX96(pair.sqrtPriceX96, pair.token0Decimals, pair.token1Decimals) * getPriceFromSqrtPriceX96(stablePair.sqrtPriceX96, stablePair.token0Decimals, stablePair.token1Decimals);
                     const fetchedToken = await this.tokenStore.ensure(token);
                     if (fetchedToken) fetchedToken.price = price;
                     return price;
