@@ -3,11 +3,10 @@ import { Metaplex } from '@metaplex-foundation/js';
 import { Connection } from '@solana/web3.js';
 import { run } from '@subsquid/batch-processor';
 import { augmentBlock } from '@subsquid/solana-objects';
-import { DataSourceBuilder, LogMessage, SolanaRpcClient } from '@subsquid/solana-stream';
+import { DataSourceBuilder, SolanaRpcClient } from '@subsquid/solana-stream';
 import { TypeormDatabase } from '@subsquid/typeorm-store';
-import { CreatePersonalPositionEvent, DecreaseLiquidityEvent, IncreaseLiquidityEvent, LiquidityChangeEvent, PoolCreatedEvent, SwapEvent } from './abi/generated/amm_v3/events';
+import { LiquidityChangeEvent, PoolCreatedEvent, SwapEvent } from './abi/generated/amm_v3/events';
 import { createPool, decreaseLiquidity, decreaseLiquidityV2, increaseLiquidity, increaseLiquidityV2, openPosition, openPositionV2, openPositionWithToken22Nft, swap, swapRouterBaseIn, swapV2 } from './abi/generated/amm_v3/instructions';
-import { CreatePersonalPositionEvent as CreatePersonalPosition, DecreaseLiquidityEvent as DecreaseLiquidity, IncreaseLiquidityEvent as IncreaseLiquidity } from './abi/generated/amm_v3/types';
 import { Hook, ModifyLiquidityReccord, Pool, Position } from './model/generated';
 import { ManagerStore } from './store/ManagerStore';
 import { PairRecordStore } from './store/PairRecordStore';
@@ -16,17 +15,13 @@ import { PositionStore } from './store/PositionStore';
 import { SwapRecordStore } from './store/SwapRecordStore';
 import { TokenStore } from './store/TokenStore';
 import { WalletStore } from './store/WalletStore';
+import { BatchBlockTick, divideBigIntToFloat, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, multiplyBigIntByFloat } from './utility';
 
 
 const rpcClient = new Connection(process.env.SOLANA_NODE ?? "https://api.mainnet-beta.solana.com");
 const metaplex = Metaplex.make(rpcClient);
 
-
-const LAMPORTS = 1_000_000_000;
-const INT_MAX = 2_147_483_647;
 const RaydiumCLMMProgram = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK";
-// const RinataToken = "EsXEUNEEWpAzSdY5o4iEZK57VVWqxGPen7ePASSWpump";
-// const CupseyToken = "5PsnNwPmMtsGZgG6ZqMoDJJi28BR5xpAotXHHiQhpump";
 
 // First we create a DataSource - component,
 // that defines where to get the data and what data should we get.
@@ -104,20 +99,10 @@ const dataSource = new DataSourceBuilder()
         where: {
             programId: [RaydiumCLMMProgram],
             d8: [
-                // createAmmConfig.d8,
-                // updateAmmConfig.d8,
                 createPool.d8,
-                // updatePoolStatus.d8,
-                // initializeReward.d8,
-                // collectRemainingRewards.d8,
-                // updateRewardInfos.d8,
-                // setRewardParams.d8,
-                // collectProtocolFee.d8,
-                // collectFundFee.d8,
                 openPosition.d8,
                 openPositionV2.d8,
                 openPositionWithToken22Nft.d8,
-                // closePosition.d8,
                 increaseLiquidity.d8,
                 increaseLiquidityV2.d8,
                 decreaseLiquidity.d8,
@@ -126,7 +111,7 @@ const dataSource = new DataSourceBuilder()
                 swapV2.d8,
                 swapRouterBaseIn.d8,
             ],
-
+            isCommitted: true,
         },
         include: {
             transaction: true,
@@ -137,50 +122,6 @@ const dataSource = new DataSourceBuilder()
     })
     .build()
 
-
-function bigIntPercentage(value: bigint, percentage: number, precision: number): bigint {
-    const scaleFactor = 10n ** BigInt(precision);
-    const scaledPercentage = BigInt(Math.round(percentage * Number(scaleFactor)));
-    const scaledValue = value * scaledPercentage;
-    const result = scaledValue / (100n * scaleFactor);
-    return result;
-}
-
-function divideBigIntToFloat(numerator: bigint, denominator: bigint, precision: number = 18): number {
-    if (denominator === 0n) {
-        return 0.0;
-    }
-    const scaledNumerator = numerator * 10n ** BigInt(precision);
-    const result = scaledNumerator / denominator;
-    return Number(result) / 10 ** precision;
-}
-
-function getCreatePositionEvent(logs: LogMessage[]): CreatePersonalPosition | undefined {
-    for (let log of logs) {
-        try {
-            const event = CreatePersonalPositionEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
-    }
-}
-
-function getIncreaseLiquidityEvent(logs: LogMessage[]): IncreaseLiquidity | undefined {
-    for (let log of logs) {
-        try {
-            const event = IncreaseLiquidityEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
-    }
-}
-
-function getDecreaseLiquidityEvent(logs: LogMessage[]): DecreaseLiquidity | undefined {
-    for (let log of logs) {
-        try {
-            const event = DecreaseLiquidityEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
-    }
-}
 
 // Once we've prepared a data source we can start fetching the data right away:
 //
@@ -251,6 +192,7 @@ run(dataSource, database, async ctx => {
     const liquidityRecords: Record<string, ModifyLiquidityReccord> = {};
     const pairRecordStore: PairRecordStore = new PairRecordStore(ctx.store, rpcClient);
     const swapRecordStore: SwapRecordStore = new SwapRecordStore(ctx.store, pairRecordStore);
+    const batchBlockTick: BatchBlockTick = new BatchBlockTick();
 
     if (!placeholderInited) {
         await ctx.store.upsert(HookPlaceHolder);
@@ -260,67 +202,8 @@ run(dataSource, database, async ctx => {
 
     for (let block of blocks) {
         for (let inst of block.instructions) {
+
             if (inst.programId === RaydiumCLMMProgram && !inst.transaction?.err && inst.isCommitted) {
-
-                // if (inst.d8 === createAmmConfig.d8) {
-                //     const params = createAmmConfig.decode(inst);
-                //     let ammConfig = ammConfigs[params.accounts.ammConfig] ?? await ctx.store.findOneBy(AMMConfig, { id: params.accounts.ammConfig });
-                //     if (!ammConfig) {
-                //         ammConfigs[params.accounts.ammConfig] = new AMMConfig({
-                //             id: params.accounts.ammConfig,
-                //             bump: 0,
-                //             index: params.data.index,
-                //             owner: params.accounts.owner,
-                //             protocolFeeRate: params.data.protocolFeeRate,
-                //             tradeFeeRate: params.data.tradeFeeRate,
-                //             tickSpacing: params.data.tickSpacing,
-                //             fundFeeRate: params.data.fundFeeRate,
-                //             fundOwner: ''
-                //         });
-                //     } else {
-                //         ammConfig.protocolFeeRate = params.data.protocolFeeRate;
-                //         ammConfig.tradeFeeRate = params.data.tradeFeeRate;
-                //         ammConfig.tickSpacing = params.data.tickSpacing;
-                //         ammConfig.fundFeeRate = params.data.fundFeeRate;
-                //         ammConfigs[params.accounts.ammConfig] = ammConfig;
-                //     }
-                // }
-
-                // if (inst.d8 === updateAmmConfig.d8) {
-                //     const params = updateAmmConfig.decode(inst);
-                //     const log = block.logs.find(a => (a.kind === 'data' && a.transactionIndex === inst.transactionIndex));
-                //     if (log) {
-                //         const event = ConfigChangeEvent.decodeData(base64.decode(log.message));
-                //         let ammConfig = ammConfigs[params.accounts.ammConfig] ?? await ctx.store.findOneBy(AMMConfig, { id: params.accounts.ammConfig });
-                //         if (ammConfig) {
-                //             ammConfig.fundFeeRate = event.fundFeeRate;
-                //             ammConfig.fundOwner = event.fundOwner
-                //             ammConfig.index = event.index
-                //             ammConfig.owner = event.owner
-                //             ammConfig.protocolFeeRate = event.protocolFeeRate
-                //             ammConfig.tickSpacing = event.tickSpacing
-                //             ammConfig.tradeFeeRate = event.tradeFeeRate
-                //             ammConfigs[params.accounts.ammConfig] = ammConfig
-                //         }
-
-                //     }
-                //     console.dir(["updateAmmConfig", inst.getTransaction().signatures,], { depth: null });
-                // }
-
-                // if (inst.d8 === updatePoolStatus.d8) {
-                //     const params = updatePoolStatus.decode(inst);
-                //     const pool = pools[params.accounts.poolState] ?? await ctx.store.findOneBy(Pool, { id: params.accounts.poolState });
-                //     if (pool) {
-                //         pool.status = params.data.status;
-                //         pools[params.accounts.poolState] = pool;
-                //     }
-                // }
-
-                // if (inst.d8 === collectProtocolFee.d8)
-                //     console.dir(["collectProtocolFee", inst.getTransaction().signatures, collectProtocolFee.decode(inst)], { depth: null });
-
-                // if (inst.d8 === collectFundFee.d8)
-                //     console.dir(["collectFundFee", inst.getTransaction().signatures, collectFundFee.decode(inst)], { depth: null });
 
                 // if (inst.d8 === closePosition.d8) {
                 //     const params = closePosition.decode(inst);
@@ -471,107 +354,6 @@ run(dataSource, database, async ctx => {
                     }
                 }
 
-                // if (inst.d8 === swap.d8) {
-                //     const params = swap.decode(inst);
-                //     const pool = pools[params.accounts.poolState] ?? await ctx.store.findOneBy(Pool, { id: params.accounts.poolState });
-                //     if (pool) {
-                //         pool.swapCount += 1n;
-                //         pools[params.accounts.poolState] = pool;
-                //     }
-                // }
-
-                // if (inst.d8 === swapV2.d8) {
-                //     const params = swapV2.decode(inst);
-                //     const pool = pools[params.accounts.poolState] ?? await ctx.store.findOneBy(Pool, { id: params.accounts.poolState });
-                //     if (pool) {
-                //         pool.swapCount += 1n;
-                //         pools[params.accounts.poolState] = pool;
-                //     }
-                // }
-
-                // if (inst.d8 === swapRouterBaseIn.d8) {
-                //     const params = swapRouterBaseIn.decode(inst);
-                //     console.dir(["swapRouterBaseIn", inst.getTransaction().signatures, params], { depth: null });
-                // }
-
-                // if (inst.d8 === setRewardParams.d8) {
-                //     const params = setRewardParams.decode(inst);
-                //     const pool = pools[params.accounts.poolState] ?? await ctx.store.findOneBy(Pool, { id: params.accounts.poolState });
-                //     if (pool) {
-                //         const rewardId = `${params.accounts.poolState}-${params.data.rewardIndex}`;
-                //         const reward = rewards[rewardId] ?? await ctx.store.findOneBy(Reward, { id: rewardId });
-                //         if (reward) {
-                //             reward.emissionsPerSecondX64 = params.data.emissionsPerSecondX64;
-                //             reward.openTime = new Date(Number(params.data.openTime));
-                //             reward.endTime = new Date(Number(params.data.endTime));
-                //             rewards[rewardId] = reward;
-                //             pools[params.accounts.poolState] = pool;
-                //         }
-                //     }
-                // }
-
-                // if (inst.d8 === initializeReward.d8) {
-                //     const params = initializeReward.decode(inst);
-                //     console.dir([inst.transaction?.signatures, params], { depth: null });
-                //     const pool = pools[params.accounts.poolState] ?? await ctx.store.findOneBy(Pool, { id: params.accounts.poolState });
-                //     if (pool) {
-                //         // I can ensure the index reward will be related to pool token0, token1
-                //         // for now we assume reward index will be based order of initialization.
-                //         let storedRewards = Object.values(rewards).filter(a => a.poolId === params.accounts.poolState) ?? [];
-                //         if (storedRewards.length < 1) {
-                //             storedRewards = await ctx.store.findBy(Reward, { poolId: params.accounts.poolState }) ?? [];
-                //             storedRewards.forEach(a => (rewards[a.id] = a));
-                //         }
-                //         const rewardId = `${params.accounts.poolState}-${storedRewards.length}`;
-                //         const reward = rewards[rewardId] ?? await ctx.store.findOneBy(Reward, { id: rewardId });
-                //         if (!reward) rewards[params.accounts.poolState] =
-                //             new Reward({
-                //                 id: rewardId,
-                //                 index: storedRewards.length,
-                //                 rewardFunder: params.accounts.rewardFunder,
-                //                 ammConfig: params.accounts.ammConfig,
-                //                 poolId: params.accounts.poolState,
-                //                 rewardToken: params.accounts.rewardTokenMint,
-                //                 openTime: new Date(Number(params.data.param.openTime)),
-                //                 endTime: new Date(Number(params.data.param.endTime)),
-                //                 emissionsPerSecondX64: params.data.param.emissionsPerSecondX64,
-                //                 hash: inst.transaction?.signatures[0],
-                //                 collected: false
-                //             });
-                //     }
-                // }
-
-                // if (inst.d8 === collectRemainingRewards.d8) {
-                //     const params = collectRemainingRewards.decode(inst);
-                //     const pool = pools[params.accounts.poolState] ?? await ctx.store.findOneBy(Pool, { id: params.accounts.poolState });
-                //     if (pool) {
-                //         const rewardId = `${params.accounts.poolState}-${params.data.rewardIndex}`;
-                //         const reward = rewards[rewardId] ?? await ctx.store.findOneBy(Reward, { id: rewardId });
-                //         if (reward) {
-                //             reward.collected = true;
-                //             rewards[rewardId] = reward;
-                //             pools[params.accounts.poolState] = pool;
-                //         }
-                //     }
-                // }
-
-                // if (inst.d8 === updateRewardInfos.d8) {
-                //     const params = updateRewardInfos.decode(inst);
-                //     // since log of this instruction doesn't have poolId, so we fetch the log here rather in separate process.
-                //     const log = block.logs.find(a => (a.kind === 'data' && a.transactionIndex === inst.transactionIndex));
-                //     if (log) {
-                //         const event = UpdateRewardInfosEvent.decodeData(base64.decode(log.message));
-                //         for (let i = 0; i < event.rewardGrowthGlobalX64.length; i++) {
-                //             const rewardId = `${params.accounts.poolState}-${i}`
-                //             let reward = rewards[rewardId] ?? await ctx.store.findOneBy(Reward, { id: rewardId });
-                //             if (reward) {
-                //                 reward.emissionsPerSecondX64 = event.rewardGrowthGlobalX64[i]
-                //                 rewards[rewardId] = reward;
-                //             }
-                //         }
-                //     }
-                // }
-
 
                 if (inst.d8 === increaseLiquidity.d8 || inst.d8 === increaseLiquidityV2.d8) {
                     let poolId, positionId: string;
@@ -688,8 +470,6 @@ run(dataSource, database, async ctx => {
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
                         pairRecordStore.insert(pool.id, pool.token0Id, pool.token1Id, new Date(log.block.timestamp * 1000), event.sqrtPriceX64);
-                        pool.liquidity = event.liquidity;
-                        await poolStore.save(pool);
 
                         const token0 = await tokenStore.ensure(pool.token0Id);
                         const token1 = await tokenStore.ensure(pool.token1Id);
@@ -706,11 +486,27 @@ run(dataSource, database, async ctx => {
                             pool.amount0 -= event.amount0;
                             pool.amount1 += event.amount1
                         }
+
+                        batchBlockTick.insert(pool.id, event.tick);
+                        const collectedFee0 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
+                        const collectedFee1 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
+
+                        [pool.batchBlockMinimumTick, pool.batchBlockMaximumTick] = batchBlockTick.get(pool.id);
+                        pool.collectedFeesToken0 += collectedFee0;
+                        pool.collectedFeesToken1 += collectedFee1;
+                        pool.collectedFeesUSD = Number(multiplyBigIntByFloat(collectedFee0, await pairRecordStore.getPrice(token0.id)) + multiplyBigIntByFloat(collectedFee1, await pairRecordStore.getPrice(token1.id)));
+                        pool.price0 = await pairRecordStore.getPrice(token0.id);
+                        pool.price1 = await pairRecordStore.getPrice(token1.id);
+                        pool.currentTick = event.tick;
                         pool.volumeToken0 += event.amount0;
                         pool.volumeToken1 += event.amount1;
-
                         pool.timestamp = BigInt(log.block.timestamp);
                         pool.blockNumber = BigInt(log.block.height);
+                        pool.liquidity = event.liquidity;
+                        pool.sqrtPriceX96 = event.sqrtPriceX64;
+                        pool.volumeUSD += Number(multiplyBigIntByFloat(event.amount0, pool.price0, 6) + multiplyBigIntByFloat(event.amount1, pool.price1, 6));
+                        pool.tvlUSD = Number(multiplyBigIntByFloat(pool.amount0, pool.price0, 6) + multiplyBigIntByFloat(pool.amount1, pool.price1, 6));
+
                         await managerStore.incSwapCount();
                         await tokenStore.save(token);
                         await poolStore.save(pool);
@@ -727,12 +523,25 @@ run(dataSource, database, async ctx => {
 
                 // try {
                 //     const event = CollectPersonalFeeEvent.decodeData(base64.decode(log.message));
-                //     console.dir(["success decode: CollectPersonalFeeEvent", event], { depth: null });
+                //     const pool = await poolStore.get(event.);
+                //     if (pool) {
+                //         pool.collectedFeesToken0 += event.amount0;
+                //         pool.collectedFeesToken1 += event.amount1;
+                //         pool.collectedFeesUSD += Number(multiplyBigIntByFloat(event.amount0, await pairRecordStore.getPrice(pool.token0Id)) + multiplyBigIntByFloat(event.amount0, await pairRecordStore.getPrice(pool.token0Id)));
+                //         poolStore.save(pool);
+                //     }
                 // } catch (_) { }
 
                 // try {
                 //     const event = CollectProtocolFeeEvent.decodeData(base64.decode(log.message));
-                //     console.dir(["success decode: CollectProtocolFeeEvent", event], { depth: null });
+                //     const pool = await poolStore.get(event.poolState);
+                //     if (pool) {
+                //         pool.collectedFeesToken0 += event.amount0;
+                //         pool.collectedFeesToken1 += event.amount1;
+                //         pool.collectedFeesUSD += Number(multiplyBigIntByFloat(event.amount0, await pairRecordStore.getPrice(pool.token0Id)) + multiplyBigIntByFloat(event.amount0, await pairRecordStore.getPrice(pool.token0Id)));
+                //         poolStore.save(pool);
+                //     }
+                //     // console.dir(["success decode: CollectProtocolFeeEvent", event], { depth: null });
                 // } catch (_) { }
 
             }
@@ -744,14 +553,4 @@ run(dataSource, database, async ctx => {
     await positionStore.flush();
     await managerStore.flush();
     await swapRecordStore.flush();
-
-    // await ctx.store.upsert(Object.values(wallets));
-    // console.dir(["pool", Object.values(pools)], { depth: null });
-    // await ctx.store.upsert(Object.values(pools));
-
-    // await ctx.store.upsert(Object.values(positions));
-    // await ctx.store.upsert(Object.values(poolDays));
-    // await ctx.store.upsert(Object.values(poolHours));
-    // await ctx.store.upsert(Object.values(swapRecords));
-    // await ctx.store.upsert(Object.values(liquidityRecords));
 })
