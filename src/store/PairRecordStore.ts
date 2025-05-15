@@ -2,6 +2,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { Store } from "@subsquid/typeorm-store";
 import { PoolState } from "../abi/pool";
 import { PairRecord } from "../model";
+import { TokenStore } from "./TokenStore";
 
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const USDT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
@@ -23,10 +24,12 @@ export class PairRecordStore {
     private readonly store: Store;
     private temps: Record<string, PairRecord> = {};
     private readonly rpcClient: Connection;
+    private readonly tokenStore: TokenStore;
 
-    constructor(store: Store, rpcClient: Connection) {
+    constructor(store: Store, tokenStore: TokenStore, rpcClient: Connection) {
         this.store = store;
         this.rpcClient = rpcClient;
+        this.tokenStore = tokenStore;
     }
 
     private async fetchPool(poolState: string): Promise<PoolState | undefined> {
@@ -108,11 +111,18 @@ export class PairRecordStore {
 
     async getPrice(token: string): Promise<number> {
 
-        if (token === USDT || token === USDC) return 1.0;
+        if (token === USDT || token === USDC) {
+            const fetchedToken = await this.tokenStore.ensure(token);
+            if (fetchedToken) fetchedToken.price = 1.0;
+            return 1.0
+        };
 
         const stableBackup = await this.getStablePairByToken1(token);
         if (stableBackup) {
-            return getPriceFromSqrtPriceX96(stableBackup.sqrtPriceX96);
+            const price = getPriceFromSqrtPriceX96(stableBackup.sqrtPriceX96);
+            const fetchedToken = await this.tokenStore.ensure(token);
+            if (fetchedToken) fetchedToken.price = price;
+            return price;
         }
 
         const checked: Set<string> = new Set();
@@ -126,7 +136,10 @@ export class PairRecordStore {
 
                 const stablePair = await this.getStablePairByToken1(pair.token1);
                 if (stablePair) {
-                    return getPriceFromSqrtPriceX96(pair.sqrtPriceX96) * getPriceFromSqrtPriceX96(stablePair.sqrtPriceX96);
+                    const price = getPriceFromSqrtPriceX96(pair.sqrtPriceX96) * getPriceFromSqrtPriceX96(stablePair.sqrtPriceX96);
+                    const fetchedToken = await this.tokenStore.ensure(token);
+                    if (fetchedToken) fetchedToken.price = price;
+                    return price;
                 }
 
                 checked.add(pair.token0)

@@ -30,7 +30,7 @@ export class TokenStore {
                 id: mintAddress,
                 name: token.name ?? '',
                 symbol: token.symbol ?? '',
-                decimals: token.mint.decimals ?? 0,
+                decimals: token.mint.decimals ?? 9,
                 price: 0,
                 poolCount: 0,
                 swapCount: 0n,

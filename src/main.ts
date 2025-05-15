@@ -1,5 +1,4 @@
 import { base64 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
-import { Metaplex } from '@metaplex-foundation/js';
 import { Connection } from '@solana/web3.js';
 import { run } from '@subsquid/batch-processor';
 import { augmentBlock } from '@subsquid/solana-objects';
@@ -7,7 +6,8 @@ import { DataSourceBuilder, SolanaRpcClient } from '@subsquid/solana-stream';
 import { TypeormDatabase } from '@subsquid/typeorm-store';
 import { LiquidityChangeEvent, PoolCreatedEvent, SwapEvent } from './abi/generated/amm_v3/events';
 import { createPool, decreaseLiquidity, decreaseLiquidityV2, increaseLiquidity, increaseLiquidityV2, openPosition, openPositionV2, openPositionWithToken22Nft, swap, swapRouterBaseIn, swapV2 } from './abi/generated/amm_v3/instructions';
-import { Hook, ModifyLiquidityReccord, Pool, Position } from './model/generated';
+import { Hook, Pool, Position } from './model/generated';
+import { LiquidityRecordStore } from './store/LiquidityRecordStore';
 import { ManagerStore } from './store/ManagerStore';
 import { PairRecordStore } from './store/PairRecordStore';
 import { PoolStore } from './store/PoolStore';
@@ -19,7 +19,6 @@ import { BatchBlockTick, divideBigIntToFloat, getCreatePositionEvent, getDecreas
 
 
 const rpcClient = new Connection(process.env.SOLANA_NODE ?? "https://api.mainnet-beta.solana.com");
-const metaplex = Metaplex.make(rpcClient);
 
 const RaydiumCLMMProgram = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK";
 
@@ -189,8 +188,8 @@ run(dataSource, database, async ctx => {
     const poolStore: PoolStore = new PoolStore(ctx.store, rpcClient);
     const walletStore: WalletStore = new WalletStore(ctx.store);
     const tokenStore: TokenStore = new TokenStore(ctx.store, rpcClient);
-    const liquidityRecords: Record<string, ModifyLiquidityReccord> = {};
-    const pairRecordStore: PairRecordStore = new PairRecordStore(ctx.store, rpcClient);
+    const liquidityRecordStore: LiquidityRecordStore = new LiquidityRecordStore(ctx.store);
+    const pairRecordStore: PairRecordStore = new PairRecordStore(ctx.store, tokenStore, rpcClient);
     const swapRecordStore: SwapRecordStore = new SwapRecordStore(ctx.store, pairRecordStore);
     const batchBlockTick: BatchBlockTick = new BatchBlockTick();
 
@@ -343,8 +342,7 @@ run(dataSource, database, async ctx => {
                                 pool.amount1 += event.depositAmount1;
                             }
 
-                            if (!owner.positions) owner.positions = []
-                            owner.positions.push(newPosition);
+                            // if (!owner.positions) owner.positions = [newPosition];
                             await walletStore.save(owner);
                             await positionStore.save(newPosition);
                             await poolStore.save(pool);
@@ -438,30 +436,18 @@ run(dataSource, database, async ctx => {
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
                         pool.currentTick = event.tick;
-                        pool.batchBlockMinimumTick = event.tickLower;
-                        pool.batchBlockMaximumTick = event.tickUpper;
+                        // pool.batchBlockMinimumTick = event.tickLower;
+                        // pool.batchBlockMaximumTick = event.tickUpper;
+
                         pool.liquidity = event.liquidityAfter;
                         pool.timestamp = BigInt(log.block.timestamp);
                         pool.blockNumber = BigInt(log.block.height);
                         await poolStore.save(pool);
 
                         const sender = await walletStore.ensure(log.getInstruction().accounts[0]);
-
                         const recordId = `${log.id}-${log.logIndex}`
-                        liquidityRecords[recordId] = new ModifyLiquidityReccord({
-                            id: recordId,
-                            poolId: pool.id,
-                            poolEntityId: pool.id,
-                            poolEntity: pool,
-                            liquidityDelta: event.liquidityBefore - event.liquidityAfter,
-                            senderId: sender.id,
-                            sender: sender,
-                            tickLower: event.tickLower,
-                            tickUpper: event.tickUpper,
-                            hash: log.transaction?.signatures[0],
-                            txAtTimestamp: BigInt(log.block.timestamp),
-                            txAtBlockNumber: BigInt(log.block.height)
-                        })
+                        await liquidityRecordStore.record(recordId, log.transaction!.signatures[0], pool, sender, event, log.block);
+
                     }
                 } catch (_) { }
 
@@ -507,6 +493,8 @@ run(dataSource, database, async ctx => {
                         pool.volumeUSD += Number(multiplyBigIntByFloat(event.amount0, pool.price0, 6) + multiplyBigIntByFloat(event.amount1, pool.price1, 6));
                         pool.tvlUSD = Number(multiplyBigIntByFloat(pool.amount0, pool.price0, 6) + multiplyBigIntByFloat(pool.amount1, pool.price1, 6));
 
+                        await managerStore.addFeeUSD(pool.fee);
+                        await managerStore.addVolumeUSD(pool.volumeUSD);
                         await managerStore.incSwapCount();
                         await tokenStore.save(token);
                         await poolStore.save(pool);
@@ -547,10 +535,12 @@ run(dataSource, database, async ctx => {
             }
         }
     }
-    await tokenStore.flush();
+
     await walletStore.flush();
+    await tokenStore.flush();
     await poolStore.flush();
     await positionStore.flush();
     await managerStore.flush();
     await swapRecordStore.flush();
+    await liquidityRecordStore.flush();
 })
