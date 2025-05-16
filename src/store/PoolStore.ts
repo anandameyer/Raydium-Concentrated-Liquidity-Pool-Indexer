@@ -26,7 +26,6 @@ export class PoolStore {
     }
 
     async fetchAMMConfig(ammConfig: string): Promise<AMMConfig> {
-
         const configAddress = new PublicKey(ammConfig);
         const value = await this.rpcClient.getAccountInfo(configAddress);
 

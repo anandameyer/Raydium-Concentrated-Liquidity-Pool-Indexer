@@ -1,5 +1,4 @@
 import { base64 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
-import { LogMessage } from "@subsquid/solana-stream";
 import { CollectPersonalFeeEvent, CollectProtocolFeeEvent, CreatePersonalPositionEvent, DecreaseLiquidityEvent, IncreaseLiquidityEvent } from './abi/generated/amm_v3/events';
 import { CollectPersonalFeeEvent as CollectPersonalFee, CreatePersonalPositionEvent as CreatePersonalPosition, DecreaseLiquidityEvent as DecreaseLiquidity, IncreaseLiquidityEvent as IncreaseLiquidity, CollectProtocolFeeEvent as ProtocolFeeEvent } from './abi/generated/amm_v3/types';
 
@@ -60,48 +59,81 @@ export function multiplyBigIntByFloat(bigIntValue: bigint, floatValue: number): 
     return result;
 }
 
+interface EventObject {
+    d8: string
+}
+
+interface LogMessage {
+    kind: 'data' | 'log' | 'other'
+    message: string
+}
+
+export function isEvent(event: EventObject, log: LogMessage): boolean {
+    if (log.kind !== 'data') return false;
+    if (!log.message) return false;
+    if (log.message.length < 12) return false;
+
+    const base64Chunk = log.message.slice(0, 12);
+    const binStr = atob(base64Chunk);
+    const hex = Array.from(binStr)
+        .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join('');
+    const result = `0x${hex.slice(0, 16)}`;
+    return event.d8 === result;
+}
+
 export function getCreatePositionEvent(logs: LogMessage[]): CreatePersonalPosition | undefined {
     for (let log of logs) {
-        try {
-            const event = CreatePersonalPositionEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
+        if (log.kind === 'data') {
+            if (isEvent(CreatePersonalPositionEvent, log)) {
+                const event = CreatePersonalPositionEvent.decodeData(base64.decode(log.message));
+                return event;
+            }
+        }
     }
 }
 
 export function getIncreaseLiquidityEvent(logs: LogMessage[]): IncreaseLiquidity | undefined {
     for (let log of logs) {
-        try {
-            const event = IncreaseLiquidityEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
+        if (log.kind === 'data') {
+            if (isEvent(IncreaseLiquidityEvent, log)) {
+                const event = IncreaseLiquidityEvent.decodeData(base64.decode(log.message));
+                return event;
+            }
+        }
     }
 }
 
 export function getDecreaseLiquidityEvent(logs: LogMessage[]): DecreaseLiquidity | undefined {
     for (let log of logs) {
-        try {
-            const event = DecreaseLiquidityEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
+        if (log.kind === 'data') {
+            if (isEvent(DecreaseLiquidityEvent, log)) {
+                const event = DecreaseLiquidityEvent.decodeData(base64.decode(log.message));
+                return event;
+            }
+        }
     }
 }
 
 export function getCollectProtocolFeeEvent(logs: LogMessage[]): ProtocolFeeEvent | undefined {
     for (let log of logs) {
-        try {
-            const event = CollectProtocolFeeEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
+        if (log.kind === 'data') {
+            if (isEvent(CollectProtocolFeeEvent, log)) {
+                const event = CollectProtocolFeeEvent.decodeData(base64.decode(log.message));
+                return event;
+            }
+        }
     }
 }
 
 export function getCollectPersonalFeeEvent(logs: LogMessage[]): CollectPersonalFee | undefined {
     for (let log of logs) {
-        try {
-            const event = CollectPersonalFeeEvent.decodeData(base64.decode(log.message));
-            return event;
-        } catch (_) { }
+        if (log.kind === 'data') {
+            if (isEvent(CollectPersonalFeeEvent, log)) {
+                const event = CollectPersonalFeeEvent.decodeData(base64.decode(log.message));
+                return event;
+            }
+        }
     }
 }
 

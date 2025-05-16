@@ -15,7 +15,7 @@ import { PositionStore } from './store/PositionStore';
 import { SwapRecordStore } from './store/SwapRecordStore';
 import { TokenStore } from './store/TokenStore';
 import { WalletStore } from './store/WalletStore';
-import { BatchBlockTick, bigIntToDecimalStr, calculateTokenRatio, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, multiplyBigIntByFloat } from './utility';
+import { BatchBlockTick, bigIntToDecimalStr, calculateTokenRatio, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, isEvent, multiplyBigIntByFloat } from './utility';
 
 
 const rpcClient = new Connection(process.env.SOLANA_NODE ?? "https://api.mainnet-beta.solana.com");
@@ -84,7 +84,6 @@ const dataSource = new DataSourceBuilder()
             programId: true,
             accounts: true,
             data: true
-
         }
     })
     // By default, block can be skipped if it doesn't contain explicitly requested items.
@@ -192,14 +191,12 @@ run(dataSource, database, async ctx => {
     const batchBlockTick: BatchBlockTick = new BatchBlockTick();
 
     if (!placeholderInited) {
-        await ctx.store.upsert(HookPlaceHolder);
+        await ctx.store.insert(HookPlaceHolder);
         placeholderInited = true;
     }
 
-
     for (let block of blocks) {
         for (let inst of block.instructions) {
-
             if (inst.programId === RaydiumCLMMProgram && !inst.transaction?.err && inst.isCommitted) {
 
                 if (inst.d8 === createPool.d8) {
@@ -423,7 +420,7 @@ run(dataSource, database, async ctx => {
         for (let log of block.logs) {
             if (log.programId === RaydiumCLMMProgram) {
 
-                try {
+                if (isEvent(PoolCreatedEvent, log)) {
                     const event = PoolCreatedEvent.decodeData(base64.decode(log.message));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
@@ -431,9 +428,9 @@ run(dataSource, database, async ctx => {
                         pool.tickSpacing = event.tickSpacing;
                         poolStore.save(pool);
                     }
-                } catch (_) { }
+                }
 
-                try {
+                if (isEvent(LiquidityChangeEvent, log)) {
                     const event = LiquidityChangeEvent.decodeData(base64.decode(log.message));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
@@ -451,9 +448,9 @@ run(dataSource, database, async ctx => {
                         await liquidityRecordStore.record(recordId, log.transaction!.signatures[0], pool, sender, event, log.block);
 
                     }
-                } catch (_) { }
+                }
 
-                try {
+                if (isEvent(SwapEvent, log)) {
                     const event = SwapEvent.decodeData(base64.decode(log.message));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
@@ -513,10 +510,8 @@ run(dataSource, database, async ctx => {
                         await managerStore.incSwapCount();
                         await tokenStore.save(token);
                         await poolStore.save(pool);
-                    } else {
-                        // pairRecordStore.withPoolFetch(event.poolState, new Date(log.block.timestamp), event.sqrtPriceX64);
                     }
-                } catch (_) { }
+                }
             }
         }
     }
