@@ -3,6 +3,13 @@ import { LogMessage } from "@subsquid/solana-stream";
 import { CollectPersonalFeeEvent, CollectProtocolFeeEvent, CreatePersonalPositionEvent, DecreaseLiquidityEvent, IncreaseLiquidityEvent } from './abi/generated/amm_v3/events';
 import { CollectPersonalFeeEvent as CollectPersonalFee, CreatePersonalPositionEvent as CreatePersonalPosition, DecreaseLiquidityEvent as DecreaseLiquidity, IncreaseLiquidityEvent as IncreaseLiquidity, CollectProtocolFeeEvent as ProtocolFeeEvent } from './abi/generated/amm_v3/types';
 
+export function calculateTokenRatio(amount0: bigint, amount1: bigint, decimals0: number, decimals1: number): number {
+    if (amount1 === 0n) return 0;
+    const scaledAmount0 = Number(amount0) / 10 ** decimals0;
+    const scaledAmount1 = Number(amount1) / 10 ** decimals1;
+    return scaledAmount0 / scaledAmount1;
+}
+
 export function bigIntToDecimalStr(value: bigint, decimals: number = 9, trimTrailingZeros: boolean = true): string {
 
     if (decimals < 0) throw new Error("Decimals cannot be negative");
@@ -32,15 +39,25 @@ export function bigIntPercentage(value: bigint, percentage: number, precision: n
     return result;
 }
 
-export function multiplyBigIntByFloat(bigIntValue: bigint, floatValue: number, scale: number = 0): bigint {
+export function multiplyBigIntByFloat(bigIntValue: bigint, floatValue: number): bigint {
     if (!Number.isFinite(floatValue)) throw new Error("Float value must be a finite number");
 
     if (floatValue === 0.0) return 0n;
 
-    const scaleFactor = 10 ** scale;
+    const floatStr = floatValue.toString();
+    const decimalIndex = floatStr.indexOf('.');
+    const decimalPlaces = decimalIndex === -1 ? 0 : floatStr.length - decimalIndex - 1;
+
+    const scaleFactor = 10 ** decimalPlaces;
     const scaledFloat = Math.round(floatValue * scaleFactor);
-    const scaledResult = bigIntValue * BigInt(scaledFloat);
-    return scaledResult / BigInt(scaleFactor);
+    const scaledBigInt = bigIntValue * BigInt(scaledFloat);
+    let result = scaledBigInt / BigInt(scaleFactor);
+    const remainder = scaledBigInt % BigInt(scaleFactor);
+
+    const threshold = BigInt(scaleFactor) / 2n;
+    if (remainder >= threshold) result += 1n;
+
+    return result;
 }
 
 export function getCreatePositionEvent(logs: LogMessage[]): CreatePersonalPosition | undefined {

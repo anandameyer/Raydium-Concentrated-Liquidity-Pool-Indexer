@@ -81,15 +81,12 @@ export class SwapRecordStore {
             txAtBlockNumber: BigInt(block.height)
         }));
 
-        await this.recordTokenData(token0, timestamp, startOfDay, startOfHour);
-        await this.recordTokenData(token1, timestamp, startOfDay, startOfHour);
+        await this.recordTokenData(token0, event.amount0, timestamp, startOfDay, startOfHour);
+        await this.recordTokenData(token1, event.amount1, timestamp, startOfDay, startOfHour);
         await this.recordPoolData(pool, token0, token1, event, block);
-
     }
 
-    private async recordTokenData(token: Token, timestamp: Date, startOfDay: Date, startOfHour: Date): Promise<void> {
-
-        token.swapCount += 1n;
+    private async recordTokenData(token: Token, amount: bigint, timestamp: Date, startOfDay: Date, startOfHour: Date): Promise<void> {
         const tokenHourId = `${token.id}-${startOfDay.getTime() + startOfHour.getTime()}`
 
         const fetchedPrice = await this.pairRecordStore.getPrice(token.id);
@@ -149,13 +146,22 @@ export class SwapRecordStore {
         startOfDay.setHours(0, 0, 0, 0);
         const startOfHour = new Date(block.timestamp * 1000);
         startOfHour.setMinutes(0, 0, 0);
+        const startOfHourBefore = new Date(startOfHour.getTime());
+        startOfHourBefore.setHours(startOfHour.getHours() - 1, 0, 0, 0);
+        const startOfDayBefore = new Date(startOfDay.getTime());
+        startOfDayBefore.setDate(startOfDay.getDate() - 1);
+        startOfDayBefore.setHours(0, 0, 0, 0);
 
         const fetchedPrice = await this.pairRecordStore.getPrice(token1.id);
 
-        const collectedFee0 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
-        const collectedFee1 = multiplyBigIntByFloat(event.amount0, pool.fee / 1000);
+        const collectedFee0 = event.zeroForOne ? multiplyBigIntByFloat(event.amount0, pool.fee / 10000) : 0n;
+        const collectedFee1 = event.zeroForOne ? 0n : multiplyBigIntByFloat(event.amount1, pool.fee / 10000);
 
         const poolHourId = `${pool.id}-${startOfDay.getTime()}-${startOfHour.getTime()}`;
+        const poolHourBeforeId = `${pool.id}-${startOfDay.getTime()}-${startOfHourBefore.getTime()}`;
+        const poolHourBefore = await this.getPoolHour(poolHourBeforeId);
+        let poolHourBeforeVolume = 0n;
+        if (poolHourBefore) poolHourBeforeVolume = poolHourBefore.volumeToken0 + poolHourBefore.volumeToken1;
         let poolHour = await this.getPoolHour(poolHourId);
 
         if (!poolHour) {
@@ -170,12 +176,12 @@ export class SwapRecordStore {
                 volumeToken0: event.amount0,
                 volumeToken0D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeToken1: event.amount1,
-                volumeToken1D: bigIntToDecimalStr(event.amount0, token0.decimals),
-                volumeUSD: Number(multiplyBigIntByFloat(event.amount0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(event.amount1, await this.pairRecordStore.getPrice(token1.id), 6)),
-                volumePercentageChange: 0,
+                volumeToken1D: bigIntToDecimalStr(event.amount1, token0.decimals),
+                volumeUSD: await this.pairRecordStore.getPriceForAmount(token0.id, event.amount0) + await this.pairRecordStore.getPriceForAmount(token1.id, event.amount1),
+                volumePercentageChange: divideBigIntToFloat(event.amount0 + event.amount1, poolHourBeforeVolume > 0n ? poolHourBeforeVolume : 1n),
                 collectedFeesToken0: collectedFee0,
                 collectedFeesToken1: collectedFee1,
-                collectedFeesUSD: Number(multiplyBigIntByFloat(collectedFee0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(collectedFee1, await this.pairRecordStore.getPrice(token1.id), 6)),
+                collectedFeesUSD: await this.pairRecordStore.getPriceForAmount(token0.id, collectedFee0) + await this.pairRecordStore.getPriceForAmount(token1.id, collectedFee1),
                 swapCount: 1n,
                 open: fetchedPrice,
                 high: fetchedPrice,
@@ -187,15 +193,15 @@ export class SwapRecordStore {
             poolHour.liquidity += event.liquidity;
             poolHour.sqrtPrice = event.sqrtPriceX64;
             poolHour.tick = event.tick;
-            poolHour.volumeUSD += Number(multiplyBigIntByFloat(event.amount0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(event.amount1, await this.pairRecordStore.getPrice(token1.id), 6));
-            poolHour.volumePercentageChange = divideBigIntToFloat((pool.volumeToken0 + pool.volumeToken1), (event.amount0 + event.amount1));
+            poolHour.volumeUSD += await this.pairRecordStore.getPriceForAmount(token0.id, event.amount0) + await this.pairRecordStore.getPriceForAmount(token1.id, event.amount1);;
+            poolHour.volumePercentageChange = divideBigIntToFloat(pool.amount0 + pool.amount1, poolHourBeforeVolume > 0n ? poolHourBeforeVolume : 1n);
             poolHour.volumeToken0 += event.amount0;
             poolHour.volumeToken1 += event.amount1;
             poolHour.volumeToken0D = bigIntToDecimalStr(poolHour.volumeToken0, token0.decimals);
             poolHour.volumeToken1D = bigIntToDecimalStr(poolHour.volumeToken1, token1.decimals);
             poolHour.collectedFeesToken0 += collectedFee0;
             poolHour.collectedFeesToken1 += collectedFee1;
-            poolHour.collectedFeesUSD += Number(multiplyBigIntByFloat(collectedFee0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(collectedFee1, await this.pairRecordStore.getPrice(token1.id), 6));
+            poolHour.collectedFeesUSD += await this.pairRecordStore.getPriceForAmount(token0.id, collectedFee0) + await this.pairRecordStore.getPriceForAmount(token1.id, collectedFee1);;
             poolHour.swapCount += 1n;
             poolHour.close = fetchedPrice;
             if (fetchedPrice > poolHour.high) poolHour.high = fetchedPrice;
@@ -204,6 +210,11 @@ export class SwapRecordStore {
         this.poolHours[poolHourId] = poolHour;
 
         const poolDayId = `${pool.id}-${startOfDay.getTime()}`;
+        const poolDayBeforeId = `${pool.id}-${startOfDayBefore.getTime()}`;
+        let poolDayBefore = await this.getPoolDay(poolDayBeforeId);
+        let poolDayBeforeVolume = 0n;
+        if (poolDayBefore) poolDayBeforeVolume = poolDayBefore.volumeToken0 + poolDayBefore.volumeToken1;
+
         let poolDay = await this.getPoolDay(poolDayId);
         if (!poolDay) {
             poolDay = new PoolDayData({
@@ -218,11 +229,11 @@ export class SwapRecordStore {
                 volumeToken0D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeToken1: event.amount1,
                 volumeToken1D: bigIntToDecimalStr(event.amount0, token0.decimals),
-                volumeUSD: Number(multiplyBigIntByFloat(event.amount0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(event.amount1, await this.pairRecordStore.getPrice(token1.id), 6)),
-                volumePercentageChange: 0,
+                volumeUSD: await this.pairRecordStore.getPriceForAmount(token0.id, event.amount0) + await this.pairRecordStore.getPriceForAmount(token1.id, event.amount1),
+                volumePercentageChange: divideBigIntToFloat(event.amount0 + event.amount1, poolDayBeforeVolume > 0n ? poolDayBeforeVolume : 1n),
                 collectedFeesToken0: collectedFee0,
                 collectedFeesToken1: collectedFee1,
-                collectedFeesUSD: Number(multiplyBigIntByFloat(collectedFee0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(collectedFee1, await this.pairRecordStore.getPrice(token1.id), 6)),
+                collectedFeesUSD: await this.pairRecordStore.getPriceForAmount(token0.id, collectedFee0) + await this.pairRecordStore.getPriceForAmount(token1.id, collectedFee1),
                 swapCount: 1n,
                 open: fetchedPrice,
                 high: fetchedPrice,
@@ -234,15 +245,15 @@ export class SwapRecordStore {
             poolDay.liquidity += event.liquidity;
             poolDay.sqrtPrice = event.sqrtPriceX64;
             poolDay.tick = event.tick;
-            poolDay.volumeUSD += Number(multiplyBigIntByFloat(event.amount0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(event.amount1, await this.pairRecordStore.getPrice(token1.id), 6));
-            poolDay.volumePercentageChange = divideBigIntToFloat((pool.volumeToken0 + pool.volumeToken1), (event.amount0 + event.amount1));
+            poolDay.volumeUSD += await this.pairRecordStore.getPriceForAmount(token0.id, event.amount0) + await this.pairRecordStore.getPriceForAmount(token1.id, event.amount1);
+            poolDay.volumePercentageChange = divideBigIntToFloat(pool.amount0 + pool.amount1, poolDayBeforeVolume > 0n ? poolDayBeforeVolume : 1n);
             poolDay.volumeToken0 += event.amount0;
             poolDay.volumeToken1 += event.amount1;
             poolDay.volumeToken0D = bigIntToDecimalStr(poolHour.volumeToken0, token0.decimals);
             poolDay.volumeToken1D = bigIntToDecimalStr(poolHour.volumeToken1, token1.decimals);
             poolDay.collectedFeesToken0 += collectedFee0;
             poolDay.collectedFeesToken1 += collectedFee1;
-            poolDay.collectedFeesUSD += Number(multiplyBigIntByFloat(collectedFee0, await this.pairRecordStore.getPrice(token0.id), 6) + multiplyBigIntByFloat(collectedFee1, await this.pairRecordStore.getPrice(token1.id), 6));
+            poolDay.collectedFeesUSD += await this.pairRecordStore.getPriceForAmount(token0.id, collectedFee0) + await this.pairRecordStore.getPriceForAmount(token1.id, collectedFee1);
             poolDay.swapCount += 1n;
             if (fetchedPrice > poolDay.high) poolDay.high = fetchedPrice;
             if (fetchedPrice < poolDay.low) poolDay.low = fetchedPrice;

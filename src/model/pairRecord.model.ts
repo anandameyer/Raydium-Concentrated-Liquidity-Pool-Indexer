@@ -33,5 +33,5 @@ export class PairRecord {
     baseStable!: boolean
 
     @BigIntColumn()
-    sqrtPriceX96!: bigint
+    sqrtPriceX64!: bigint
 }
