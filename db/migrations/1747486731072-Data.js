@@ -1,5 +1,5 @@
-module.exports = class Data1747396363462 {
-    name = 'Data1747396363462'
+module.exports = class Data1747486731072 {
+    name = 'Data1747486731072'
 
     async up(db) {
         await db.query(`CREATE TABLE "amm_configs" ("id" character varying NOT NULL, "bump" integer NOT NULL, "index" integer NOT NULL, "owner" text NOT NULL, "protocol_fee_rate" integer NOT NULL, "trade_fee_rate" integer NOT NULL, "tick_spacing" integer NOT NULL, "fund_fee_rate" integer NOT NULL, "fund_owner" text NOT NULL, CONSTRAINT "PK_6e011a3f9bf15be8931a3b9e7cb" PRIMARY KEY ("id"))`)
@@ -36,9 +36,6 @@ module.exports = class Data1747396363462 {
         await db.query(`CREATE TABLE "donate_reccord" ("id" character varying NOT NULL, "pool_id" text NOT NULL, "pool_entity_id" character varying NOT NULL, "amount0" numeric NOT NULL, "amount1" numeric NOT NULL, "sender_id" character varying NOT NULL, "hash" text NOT NULL, "tx_at_timestamp" numeric NOT NULL, "tx_at_block_number" numeric NOT NULL, CONSTRAINT "PK_3f98f4f7019cdb1732d34394815" PRIMARY KEY ("id"))`)
         await db.query(`CREATE INDEX "IDX_292b419e04b723d968e150efc2" ON "donate_reccord" ("pool_entity_id") `)
         await db.query(`CREATE INDEX "IDX_1f36445a77d0839636ad31fd68" ON "donate_reccord" ("sender_id") `)
-        await db.query(`CREATE TABLE "pair_records" ("id" character varying NOT NULL, "pool_id" text NOT NULL, "timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, "token0" text NOT NULL, "token0_decimals" integer NOT NULL, "token1" text NOT NULL, "token1_decimals" integer NOT NULL, "base_stable" boolean NOT NULL, "sqrt_price_x64" numeric NOT NULL, CONSTRAINT "PK_9ff6f44aadf62b6a89c93acf4d2" PRIMARY KEY ("id"))`)
-        await db.query(`CREATE INDEX "IDX_748e6851d2065409a0b2d263ae" ON "pair_records" ("token0") `)
-        await db.query(`CREATE INDEX "IDX_82f0466ecec760560880a1e5a9" ON "pair_records" ("token1") `)
         await db.query(`ALTER TABLE "token_day_data" ADD CONSTRAINT "FK_b8950a8bc7b60231137573740ea" FOREIGN KEY ("token_id") REFERENCES "token"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
         await db.query(`ALTER TABLE "token_hour_data" ADD CONSTRAINT "FK_7080974648c0d2c3baceb239c4e" FOREIGN KEY ("token_id") REFERENCES "token"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
         await db.query(`ALTER TABLE "pool_day_data" ADD CONSTRAINT "FK_2f4c9e466537cf8101cbdceaea1" FOREIGN KEY ("pool_id") REFERENCES "pool"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
@@ -94,9 +91,6 @@ module.exports = class Data1747396363462 {
         await db.query(`DROP TABLE "donate_reccord"`)
         await db.query(`DROP INDEX "public"."IDX_292b419e04b723d968e150efc2"`)
         await db.query(`DROP INDEX "public"."IDX_1f36445a77d0839636ad31fd68"`)
-        await db.query(`DROP TABLE "pair_records"`)
-        await db.query(`DROP INDEX "public"."IDX_748e6851d2065409a0b2d263ae"`)
-        await db.query(`DROP INDEX "public"."IDX_82f0466ecec760560880a1e5a9"`)
         await db.query(`ALTER TABLE "token_day_data" DROP CONSTRAINT "FK_b8950a8bc7b60231137573740ea"`)
         await db.query(`ALTER TABLE "token_hour_data" DROP CONSTRAINT "FK_7080974648c0d2c3baceb239c4e"`)
         await db.query(`ALTER TABLE "pool_day_data" DROP CONSTRAINT "FK_2f4c9e466537cf8101cbdceaea1"`)

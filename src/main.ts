@@ -9,11 +9,10 @@ import { createPool, decreaseLiquidity, decreaseLiquidityV2, increaseLiquidity, 
 import { Hook, Pool, Position } from './model/generated';
 import { LiquidityRecordStore } from './store/LiquidityRecordStore';
 import { ManagerStore } from './store/ManagerStore';
-import { PairRecordStore } from './store/PairRecordStore';
 import { PoolStore } from './store/PoolStore';
 import { PositionStore } from './store/PositionStore';
 import { SwapRecordStore } from './store/SwapRecordStore';
-import { TokenStore } from './store/TokenStore';
+import { TokenStore, calculateTotalPrice } from './store/TokenStore';
 import { WalletStore } from './store/WalletStore';
 import { BatchBlockTick, bigIntToDecimalStr, calculateTokenRatio, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, isEvent, multiplyBigIntByFloat } from './utility';
 
@@ -83,7 +82,10 @@ const dataSource = new DataSourceBuilder()
         instruction: { // instruction fields
             programId: true,
             accounts: true,
-            data: true
+            data: true,
+            // error: false,
+            // computeUnitsConsumed: false,
+            // hasDroppedLogMessages: false,
         }
     })
     // By default, block can be skipped if it doesn't contain explicitly requested items.
@@ -158,7 +160,7 @@ const dataSource = new DataSourceBuilder()
 //
 // For full configuration details please consult
 // https://github.com/subsquid/squid-sdk/blob/278195bd5a5ed0a9e24bfb99ee7bbb86ff94ccb3/typeorm/typeorm-config/src/config.ts#L21
-const database = new TypeormDatabase({})
+const database = new TypeormDatabase();
 
 let placeholderInited = false;
 const HookPlaceHolder = new Hook({
@@ -186,8 +188,7 @@ run(dataSource, database, async ctx => {
     const walletStore: WalletStore = new WalletStore(ctx.store);
     const tokenStore: TokenStore = new TokenStore(ctx.store, rpcClient);
     const liquidityRecordStore: LiquidityRecordStore = new LiquidityRecordStore(ctx.store);
-    const pairRecordStore: PairRecordStore = new PairRecordStore(ctx.store, tokenStore, rpcClient);
-    const swapRecordStore: SwapRecordStore = new SwapRecordStore(ctx.store, pairRecordStore);
+    const swapRecordStore: SwapRecordStore = new SwapRecordStore(ctx.store);
     const batchBlockTick: BatchBlockTick = new BatchBlockTick();
 
     if (!placeholderInited) {
@@ -206,8 +207,7 @@ run(dataSource, database, async ctx => {
 
                     if (!pool) {
                         const ammConfig = await poolStore.fetchAMMConfig(params.accounts.ammConfig);
-                        const token0 = await tokenStore.ensure(params.accounts.tokenMint0);
-                        const token1 = await tokenStore.ensure(params.accounts.tokenMint1);
+                        const [token0, token1] = await tokenStore.updatePrice(params.accounts.tokenMint0, params.accounts.tokenMint1, params.data.sqrtPriceX64);
                         token0.timestamp = BigInt(inst.block.timestamp);
                         token0.blockNumber = BigInt(inst.block.height);
                         token1.timestamp = BigInt(inst.block.timestamp);
@@ -252,12 +252,10 @@ run(dataSource, database, async ctx => {
                             createdAtTimestamp: BigInt(inst.block.timestamp),
                             createdAtBlockNumber: BigInt(inst.block.height),
                         });
-
-                        await pairRecordStore.insert({ poolId: params.accounts.poolState, token0, token1, timestamp: new Date(inst.block.timestamp * 1000), sqrtPriceX64: params.data.sqrtPriceX64 });
+                        await walletStore.ensure(params.accounts.poolCreator);
                         token0.poolCount += 1;
                         token1.poolCount += 1;
                         await tokenStore.save(token0, token1);
-                        await walletStore.ensure(params.accounts.poolCreator);
                         await poolStore.save(newPool);
                     }
                 }
@@ -286,6 +284,7 @@ run(dataSource, database, async ctx => {
                         const manager = await managerStore.getManager();
                         const position = await positionStore.get(positionId);
                         if (!position) {
+
                             const token0 = await tokenStore.ensure(pool.token0Id);
                             const token1 = await tokenStore.ensure(pool.token1Id);
                             const newPosition = new Position({
@@ -323,16 +322,13 @@ run(dataSource, database, async ctx => {
                                 newPosition.amount1 = event.depositAmount1;
                                 newPosition.amount1D = bigIntToDecimalStr(newPosition.amount1, token1.decimals);
                                 newPosition.ratio = calculateTokenRatio(newPosition.amount0, newPosition.amount1, pool.token0Decimals, pool.token1Decimals);
-                                newPosition.coreTotalUSD = await pairRecordStore.getPriceForAmount(token0.id, newPosition.amount0) + await pairRecordStore.getPriceForAmount(token1.id, newPosition.amount1);
+                                newPosition.coreTotalUSD = calculateTotalPrice(token0.price, newPosition.amount0, token0.decimals) + calculateTotalPrice(token1.price, newPosition.amount1, token1.decimals);
                                 pool.liquidity += event.liquidity;
                                 pool.amount0 += event.depositAmount0;
                                 pool.amount0D = bigIntToDecimalStr(pool.amount0, token0.decimals);
                                 pool.amount1 += event.depositAmount1;
                                 pool.amount1D = bigIntToDecimalStr(pool.amount1, token1.decimals);
                             }
-
-                            // if (!owner.positions) owner.positions = [newPosition];
-                            await walletStore.save(owner);
                             await positionStore.save(newPosition);
                             await poolStore.save(pool);
                             await managerStore.addPosition(newPosition);
@@ -360,6 +356,8 @@ run(dataSource, database, async ctx => {
                         if (position) {
                             const event = getIncreaseLiquidityEvent(block.logs);
                             if (event) {
+                                const token0 = await tokenStore.ensure(pool.token0Id);
+                                const token1 = await tokenStore.ensure(pool.token1Id);
                                 position.liquidity = event.liquidity;
                                 position.amount0 += event.amount0;
                                 position.amount1 += event.amount1;
@@ -367,7 +365,7 @@ run(dataSource, database, async ctx => {
                                 position.amount1D = bigIntToDecimalStr(position.amount1, pool.token1Decimals);
                                 position.ratio = calculateTokenRatio(position.amount0, position.amount1, pool.token0Decimals, pool.token1Decimals);;
                                 pool.liquidity += event.liquidity;
-                                position.coreTotalUSD = await pairRecordStore.getPriceForAmount(pool.token0Id, position.amount0) + await pairRecordStore.getPriceForAmount(pool.token1Id, position.amount1);
+                                position.coreTotalUSD = calculateTotalPrice(token0.price, position.amount0, token0.decimals) + calculateTotalPrice(token1.price, position.amount1, token1.decimals);
                                 pool.amount0 += event.amount0;
                                 pool.amount1 += event.amount1;
                                 pool.amount0D = bigIntToDecimalStr(pool.amount0, pool.token0Decimals);
@@ -396,12 +394,14 @@ run(dataSource, database, async ctx => {
                         if (position) {
                             const event = getDecreaseLiquidityEvent(block.logs);
                             if (event) {
+                                const token0 = await tokenStore.ensure(pool.token0Id);
+                                const token1 = await tokenStore.ensure(pool.token1Id);
                                 position.liquidity = event.liquidity;
                                 position.amount0 -= event.decreaseAmount0;
                                 position.amount1 -= event.decreaseAmount1;
                                 position.amount0D = bigIntToDecimalStr(position.amount0, pool.token0Decimals);
                                 position.amount1D = bigIntToDecimalStr(position.amount1, pool.token1Decimals);
-                                position.coreTotalUSD = await pairRecordStore.getPriceForAmount(pool.token0Id, position.amount0) + await pairRecordStore.getPriceForAmount(pool.token1Id, position.amount1);
+                                position.coreTotalUSD = calculateTotalPrice(token0.price, position.amount0, token0.decimals) + calculateTotalPrice(token1.price, position.amount1, token1.decimals);
                                 position.ratio = calculateTokenRatio(position.amount0, position.amount1, pool.token0Decimals, pool.token1Decimals);;
                                 pool.liquidity -= event.liquidity;
                                 pool.amount0 -= event.decreaseAmount0;
@@ -435,8 +435,6 @@ run(dataSource, database, async ctx => {
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
                         pool.currentTick = event.tick;
-                        // pool.batchBlockMinimumTick = event.tickLower;
-                        // pool.batchBlockMaximumTick = event.tickUpper;
 
                         pool.liquidity = event.liquidityAfter;
                         pool.timestamp = BigInt(log.block.timestamp);
@@ -455,11 +453,12 @@ run(dataSource, database, async ctx => {
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
 
-                        const token0 = await tokenStore.ensure(pool.token0Id);
-                        const token1 = await tokenStore.ensure(pool.token1Id);
+                        const [token0, token1] = await tokenStore.updatePrice(pool.token0Id, pool.token1Id, event.sqrtPriceX64);
+                        // const token0 = await tokenStore.ensure(pool.token0Id);
+                        // const token1 = await tokenStore.ensure(pool.token1Id);
                         const sender = await walletStore.ensure(event.sender);
 
-                        await pairRecordStore.insert({ poolId: pool.id, token0, token1, timestamp: new Date(log.block.timestamp * 1000), sqrtPriceX64: event.sqrtPriceX64 });
+                        // await pairRecordStore.insert({ poolId: pool.id, token0, token1, timestamp: new Date(log.block.timestamp * 1000), sqrtPriceX64: event.sqrtPriceX64 });
 
                         const recordId = `${log.id}-${log.logIndex}`;
 
@@ -485,14 +484,21 @@ run(dataSource, database, async ctx => {
                             pool.amount1 += event.amount1
                         }
 
+                        const totalVolumeUSDToken0 = calculateTotalPrice(token0.price, event.amount0, token0.decimals);
+                        const totalVolumeUSDToken1 = calculateTotalPrice(token1.price, event.amount1, token1.decimals);
+                        const poolAmountUSDToken0 = calculateTotalPrice(token0.price, pool.amount0, token0.decimals);
+                        const poolAmountUSDToken1 = calculateTotalPrice(token1.price, pool.amount1, token1.decimals);
+                        const collectedAmountUSDToken0 = calculateTotalPrice(token0.price, collectedFee0, token0.decimals);
+                        const collectedAmountUSDToken1 = calculateTotalPrice(token1.price, collectedFee1, token1.decimals);
+
                         pool.amount0D = bigIntToDecimalStr(pool.amount0, pool.token0Decimals);
                         pool.amount1D = bigIntToDecimalStr(pool.amount1, pool.token1Decimals);
                         [pool.batchBlockMinimumTick, pool.batchBlockMaximumTick] = batchBlockTick.get(pool.id);
                         pool.collectedFeesToken0 += collectedFee0;
                         pool.collectedFeesToken1 += collectedFee1;
-                        pool.collectedFeesUSD = await pairRecordStore.getPriceForAmount(token0.id, collectedFee0) + await pairRecordStore.getPriceForAmount(token1.id, collectedFee1);
-                        pool.price0 = await pairRecordStore.getPrice(token0.id);
-                        pool.price1 = await pairRecordStore.getPrice(token1.id);
+                        pool.collectedFeesUSD = collectedAmountUSDToken0 + collectedAmountUSDToken1;
+                        pool.price0 = token0.price;
+                        pool.price1 = token1.price;
                         pool.currentTick = event.tick;
                         pool.volumeToken0 += event.amount0;
                         pool.volumeToken1 += event.amount1;
@@ -502,8 +508,8 @@ run(dataSource, database, async ctx => {
                         pool.blockNumber = BigInt(log.block.height);
                         pool.liquidity = event.liquidity;
                         pool.sqrtPriceX96 = event.sqrtPriceX64;
-                        pool.volumeUSD += await pairRecordStore.getPriceForAmount(token0.id, pool.volumeToken0) + await pairRecordStore.getPriceForAmount(token1.id, pool.volumeToken1);
-                        pool.tvlUSD = await pairRecordStore.getPriceForAmount(token0.id, pool.amount0) + await pairRecordStore.getPriceForAmount(token1.id, pool.amount1);
+                        pool.volumeUSD += totalVolumeUSDToken0 + totalVolumeUSDToken1;
+                        pool.tvlUSD = poolAmountUSDToken0 + poolAmountUSDToken1;
 
                         await managerStore.addFeeUSD(pool.fee);
                         await managerStore.addVolumeUSD(pool.volumeUSD);

@@ -24,7 +24,6 @@ export class WalletStore {
         });
 
         this.temps[id] = newWallet;
-        await this.store.upsert(newWallet);
         return newWallet;
     }
 
@@ -33,7 +32,7 @@ export class WalletStore {
     }
 
     async flush(): Promise<void> {
-        this.store.upsert(Object.values(this.temps));
+        await this.store.upsert(Object.values(this.temps));
         this.temps = {};
     }
 }
