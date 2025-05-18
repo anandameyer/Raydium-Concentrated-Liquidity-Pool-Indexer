@@ -157,3 +157,56 @@ export class BatchBlockTick {
         return [lower, upper];
     }
 }
+
+export class TimeCounter {
+    private readonly name: string;
+    private counter: number = 0;
+    private max: number = 0;
+    private min: number = 0;
+    private total: number = 0;
+    private startTime: number = 0;
+    private invalid: boolean = false;
+
+    constructor(name: string) {
+        this.name = name
+    }
+
+    start(): void {
+        if (this.invalid) return;
+        if (this.startTime > 0) {
+            console.warn("start before stoping past counter");
+            this.invalid = true;
+            return;
+        }
+        this.startTime = new Date().getTime();
+    }
+
+    stop(): void {
+        if (this.invalid) return;
+        if (this.startTime === 0) {
+            console.warn("stop before starting");
+            this.invalid = true;
+            return;
+        }
+        const current = new Date().getTime();
+        const elapsed = current - this.startTime;
+        this.total += elapsed;
+        if (elapsed > this.max) this.max = elapsed;
+        if (this.min === 0 || elapsed < this.min) this.min = elapsed;
+        this.counter += 1;
+        this.startTime = 0;
+    }
+
+    log(): void {
+        // console.log(`${this.name}${this.name.length < 13 ? '\t\t' : '\t'}count: ${this.counter} objects\tavg: ${this.total > 0 ? this.total / this.counter : this.total}ms\tmin: ${this.min}ms\tmax:${this.max}ms`)
+        if (!this.invalid) {
+            console.dir({ name: this.name, count: this.counter, total: this.total, avg: this.total > 0 ? this.total / this.counter : this.total, min: this.min, max: this.max });
+            // console.log(`${this.name}: 
+            //   count: ${this.counter} objects
+            //   total: ${this.total} ms
+            //   avg:   ${this.total > 0 ? this.total / this.counter : this.total} ms
+            //   min:   ${this.min} ms
+            //   max:   ${this.max} ms`);
+        }
+    }
+}

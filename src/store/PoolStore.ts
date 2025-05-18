@@ -6,6 +6,7 @@ import { AMMConfig, Pool } from "../model";
 
 export class PoolStore {
     private temps: Record<string, Pool> = {};
+    private ammConfigs: Record<string, AMMConfig> = {};
     private readonly store: Store;
     private readonly rpcClient: Connection;
     private readonly metaplex: Metaplex;
@@ -26,12 +27,16 @@ export class PoolStore {
     }
 
     async fetchAMMConfig(ammConfig: string): Promise<AMMConfig> {
+        let result: AMMConfig | undefined = this.ammConfigs[ammConfig]
+        if (result) return result;
+        result = await this.store.findOneBy(AMMConfig, { id: ammConfig });
+        if (result) return result;
         const configAddress = new PublicKey(ammConfig);
         const value = await this.rpcClient.getAccountInfo(configAddress);
 
         if (value) {
             const config = ammConfigDecoder.decode(value.data);
-            return new AMMConfig({
+            result = new AMMConfig({
                 id: ammConfig,
                 bump: config.bump,
                 index: config.index,
@@ -42,6 +47,8 @@ export class PoolStore {
                 fundFeeRate: config.fundFeeRate,
                 fundOwner: config.fundOwner.toString()
             });
+            this.ammConfigs[ammConfig] = result;
+            return result;
         }
         return new AMMConfig();
     }
@@ -52,6 +59,8 @@ export class PoolStore {
 
     async flush(): Promise<void> {
         this.store.upsert(Object.values(this.temps));
+        this.store.upsert(Object.values(this.ammConfigs));
         this.temps = {};
+        this.ammConfigs = {};
     }
 }

@@ -49,46 +49,20 @@ export class TokenStore {
     private readonly rpcClient: Connection;
     private readonly metaplex: Metaplex;
     private readonly updated: Set<string> = new Set();
-    constructor(store: Store, rpcClient: Connection) {
+    constructor(store: Store, rpcClient: Connection, metaplex: Metaplex) {
         this.store = store;
         this.rpcClient = rpcClient;
-        this.metaplex = Metaplex.make(rpcClient);
+        this.metaplex = metaplex;
     }
 
     private async fetchToken(mintAddress: string): Promise<Token> {
         const address = new PublicKey(mintAddress);
-
-        const metadataAccount = this.metaplex
-            .nfts()
-            .pdas()
-            .metadata({ mint: address });
-
-        const metadataAccountInfo = await this.rpcClient.getAccountInfo(metadataAccount);
-
-        if (metadataAccountInfo) {
-            const token = await this.metaplex.nfts().findByMint({ mintAddress: address });
-            return new Token({
-                id: mintAddress,
-                name: token.name ?? '',
-                symbol: token.symbol ?? '',
-                decimals: token.mint.decimals ?? 9,
-                price: isStable(mintAddress) ? 1 : 0,
-                poolCount: 0,
-                swapCount: 0n,
-                chainId: 0,
-                tokenAddress: mintAddress,
-                blockNumber: 0n,
-                timestamp: 0n,
-                // tokenDayDatas: [],
-                // tokenHourDatas: []
-            })
-        }
-
+        const token = await this.metaplex.nfts().findByMint({ mintAddress: address });
         return new Token({
             id: mintAddress,
-            name: '',
-            symbol: '',
-            decimals: 0,
+            name: token.name ?? '',
+            symbol: token.symbol ?? '',
+            decimals: token.mint.decimals ?? 9,
             price: isStable(mintAddress) ? 1 : 0,
             poolCount: 0,
             swapCount: 0n,
@@ -96,10 +70,8 @@ export class TokenStore {
             tokenAddress: mintAddress,
             blockNumber: 0n,
             timestamp: 0n,
-            // tokenDayDatas: [],
-            // tokenHourDatas: []
-        });
-    }
+        })
+    };
 
     async ensure(id: string): Promise<Token> {
         let token: Token | undefined = this.temps.get(id);
