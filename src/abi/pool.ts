@@ -1,5 +1,5 @@
 import { getAddressDecoder } from "@solana/addresses";
-import { fixDecoderSize, FixedSizeDecoder, getArrayDecoder, getBytesDecoder, getI32Decoder, getStructDecoder, getU128Decoder, getU16Decoder, getU64Decoder, getU8Decoder, ReadonlyUint8Array } from "@solana/codecs";
+import { fixDecoderSize, FixedSizeDecoder, getArrayDecoder, getBytesDecoder, getStructDecoder, getU128Decoder, getU64Decoder, getU8Decoder, ReadonlyUint8Array } from "@solana/codecs";
 
 export interface RewardInfo {
     anchorDiscriminator: ReadonlyUint8Array;

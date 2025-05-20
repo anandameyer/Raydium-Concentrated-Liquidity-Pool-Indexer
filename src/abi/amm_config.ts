@@ -1,7 +1,6 @@
 // get from https://www.quicknode.com/guides/solana-development/tooling/web3-2/account-deserialization
 
-import { Address } from "@coral-xyz/anchor";
-import { getAddressDecoder } from "@solana/addresses";
+import { Address, getAddressDecoder } from "@solana/addresses";
 import { fixDecoderSize, FixedSizeDecoder, getArrayDecoder, getBytesDecoder, getStructDecoder, getU16Decoder, getU32Decoder, getU64Decoder, getU8Decoder, ReadonlyUint8Array } from "@solana/codecs";
 
 export interface AmmConfig {

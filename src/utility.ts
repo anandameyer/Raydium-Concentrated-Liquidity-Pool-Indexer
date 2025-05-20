@@ -1,4 +1,3 @@
-import { base64 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { CollectPersonalFeeEvent, CollectProtocolFeeEvent, CreatePersonalPositionEvent, DecreaseLiquidityEvent, IncreaseLiquidityEvent } from './abi/generated/amm_v3/events';
 import { CollectPersonalFeeEvent as CollectPersonalFee, CreatePersonalPositionEvent as CreatePersonalPosition, DecreaseLiquidityEvent as DecreaseLiquidity, IncreaseLiquidityEvent as IncreaseLiquidity, CollectProtocolFeeEvent as ProtocolFeeEvent } from './abi/generated/amm_v3/types';
 
@@ -86,7 +85,7 @@ export function getCreatePositionEvent(logs: LogMessage[]): CreatePersonalPositi
     for (let log of logs) {
         if (log.kind === 'data') {
             if (isEvent(CreatePersonalPositionEvent, log)) {
-                const event = CreatePersonalPositionEvent.decodeData(base64.decode(log.message));
+                const event = CreatePersonalPositionEvent.decodeData(Buffer.from(log.message, 'base64'));
                 return event;
             }
         }
@@ -97,7 +96,7 @@ export function getIncreaseLiquidityEvent(logs: LogMessage[]): IncreaseLiquidity
     for (let log of logs) {
         if (log.kind === 'data') {
             if (isEvent(IncreaseLiquidityEvent, log)) {
-                const event = IncreaseLiquidityEvent.decodeData(base64.decode(log.message));
+                const event = IncreaseLiquidityEvent.decodeData(Buffer.from(log.message, 'base64'));
                 return event;
             }
         }
@@ -108,7 +107,7 @@ export function getDecreaseLiquidityEvent(logs: LogMessage[]): DecreaseLiquidity
     for (let log of logs) {
         if (log.kind === 'data') {
             if (isEvent(DecreaseLiquidityEvent, log)) {
-                const event = DecreaseLiquidityEvent.decodeData(base64.decode(log.message));
+                const event = DecreaseLiquidityEvent.decodeData(Buffer.from(log.message, 'base64'));
                 return event;
             }
         }
@@ -119,7 +118,7 @@ export function getCollectProtocolFeeEvent(logs: LogMessage[]): ProtocolFeeEvent
     for (let log of logs) {
         if (log.kind === 'data') {
             if (isEvent(CollectProtocolFeeEvent, log)) {
-                const event = CollectProtocolFeeEvent.decodeData(base64.decode(log.message));
+                const event = CollectProtocolFeeEvent.decodeData(Buffer.from(log.message, 'base64'));
                 return event;
             }
         }
@@ -130,7 +129,7 @@ export function getCollectPersonalFeeEvent(logs: LogMessage[]): CollectPersonalF
     for (let log of logs) {
         if (log.kind === 'data') {
             if (isEvent(CollectPersonalFeeEvent, log)) {
-                const event = CollectPersonalFeeEvent.decodeData(base64.decode(log.message));
+                const event = CollectPersonalFeeEvent.decodeData(Buffer.from(log.message, 'base64'));
                 return event;
             }
         }

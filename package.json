@@ -8,7 +8,6 @@
     "dev": "docker compose down && npx tsc && docker compose up -d && sleep 5 && npx squid-typeorm-migration apply && node --inspect -r dotenv/config lib/main.js"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.30.1",
     "@metaplex-foundation/js": "^0.20.1",
     "@solana/addresses": "^2.1.1",
     "@solana/codecs": "^2.1.1",
@@ -20,16 +19,9 @@
     "@subsquid/solana-stream": "^0.0.1",
     "@subsquid/typeorm-migration": "^1.3.0",
     "@subsquid/typeorm-store": "^1.5.1",
-    "@types/bn.js": "^5.1.6",
-    "add": "^2.0.6",
-    "bn.js": "^5.2.1",
     "dotenv": "^16.4.5",
-    "install": "^0.13.0",
-    "npm": "^10.9.0",
     "pg": "^8.11.5",
-    "remove": "^0.1.5",
-    "typeorm": "^0.3.20",
-    "yarn": "^1.22.22"
+    "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@subsquid/cli": "^3.0.3",

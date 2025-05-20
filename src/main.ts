@@ -1,4 +1,3 @@
-import { base64 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { Metaplex } from '@metaplex-foundation/js';
 import { Connection } from '@solana/web3.js';
 import { run } from '@subsquid/batch-processor';
@@ -446,7 +445,7 @@ run(dataSource, database, async ctx => {
 
                 if (isEvent(PoolCreatedEvent, log)) {
                     poolCreatedEventCounter.start();
-                    const event = PoolCreatedEvent.decodeData(base64.decode(log.message));
+                    const event = PoolCreatedEvent.decodeData(Buffer.from(log.message, 'base64'));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
                         pool.currentTick = event.tick;
@@ -458,7 +457,7 @@ run(dataSource, database, async ctx => {
 
                 if (isEvent(LiquidityChangeEvent, log)) {
                     liquidityChangeEventCounter.start();
-                    const event = LiquidityChangeEvent.decodeData(base64.decode(log.message));
+                    const event = LiquidityChangeEvent.decodeData(Buffer.from(log.message, 'base64'));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
                         pool.currentTick = event.tick;
@@ -477,7 +476,7 @@ run(dataSource, database, async ctx => {
 
                 if (isEvent(SwapEvent, log)) {
                     swapEventCounter.start();
-                    const event = SwapEvent.decodeData(base64.decode(log.message));
+                    const event = SwapEvent.decodeData(Buffer.from(log.message, 'base64'));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
 
