@@ -5,20 +5,21 @@ import { augmentBlock } from '@subsquid/solana-objects';
 import { DataSourceBuilder, SolanaRpcClient } from '@subsquid/solana-stream';
 import { TypeormDatabase } from '@subsquid/typeorm-store';
 import { LiquidityChangeEvent, PoolCreatedEvent, SwapEvent } from './abi/generated/amm_v3/events';
-import { createPool, decreaseLiquidity, decreaseLiquidityV2, increaseLiquidity, increaseLiquidityV2, openPosition, openPositionV2, openPositionWithToken22Nft, swap, swapRouterBaseIn, swapV2 } from './abi/generated/amm_v3/instructions';
-import { Hook, Pool, Position } from './model/generated';
+import { closePosition, createPool, decreaseLiquidity, decreaseLiquidityV2, increaseLiquidity, increaseLiquidityV2, openPosition, openPositionV2, openPositionWithToken22Nft, swap, swapRouterBaseIn, swapV2 } from './abi/generated/amm_v3/instructions';
+import { Pool, Position } from './model/generated';
 import { LiquidityRecordStore } from './store/LiquidityRecordStore';
 import { ManagerStore } from './store/ManagerStore';
 import { PoolStore } from './store/PoolStore';
 import { PositionStore } from './store/PositionStore';
 import { SwapRecordStore } from './store/SwapRecordStore';
-import { calculateTotalPrice, TokenStore } from './store/TokenStore';
+import { calculateTotalPrice, SOLUSDCPOOLS, TokenStore } from './store/TokenStore';
 import { WalletStore } from './store/WalletStore';
-import { BatchBlockTick, bigIntToDecimalStr, calculateTokenRatio, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, isEvent, multiplyBigIntByFloat, TimeCounter } from './utility';
+import { BatchBlockTick, bigIntToDecimalStr, calculateTokenRatio, getCreatePositionEvent, getDecreaseLiquidityEvent, getIncreaseLiquidityEvent, isEvent, multiplyBigIntByFloat, zeroToNull } from './utility';
 
 
 const rpcClient = new Connection(process.env.SOLANA_NODE ?? "https://api.mainnet-beta.solana.com");
 const metaplex = new Metaplex(rpcClient);
+const showSkipedPool = process.env.SHOW_SKIPED_POOL === 'true';
 
 const RaydiumCLMMProgram = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK";
 
@@ -46,8 +47,9 @@ const dataSource = new DataSourceBuilder()
     // NOTE, that block ranges are specified in heights, not in slots !!!
     //
     // .setBlockRange({ from: 254_625_450 })
-    .setBlockRange({ from: 289_819_150 })
+    .setBlockRange({ from: 299804550 })
     // .setBlockRange({ from: 278_257_649 })
+    // .includeAllBlocks()
 
 
     //
@@ -111,6 +113,7 @@ const dataSource = new DataSourceBuilder()
                 swap.d8,
                 swapV2.d8,
                 swapRouterBaseIn.d8,
+                closePosition.d8
             ],
             isCommitted: true,
         },
@@ -163,17 +166,6 @@ const dataSource = new DataSourceBuilder()
 // https://github.com/subsquid/squid-sdk/blob/278195bd5a5ed0a9e24bfb99ee7bbb86ff94ccb3/typeorm/typeorm-config/src/config.ts#L21
 const database = new TypeormDatabase();
 
-let placeholderInited = false;
-const HookPlaceHolder = new Hook({
-    id: '0x',
-    isWhitelisted: true,
-    isBlacklisted: false,
-    chainId: 0,
-    hookAddress: '0x',
-    blockNumber: 0n,
-    timestamp: 0n
-});
-
 // Now we are ready to start data processing
 run(dataSource, database, async ctx => {
     // Block items that we get from `ctx.blocks` are flat JS objects.
@@ -191,32 +183,18 @@ run(dataSource, database, async ctx => {
     const swapRecordStore: SwapRecordStore = new SwapRecordStore(ctx.store);
     const batchBlockTick: BatchBlockTick = new BatchBlockTick();
 
-    const swapEventCounter = new TimeCounter("SwapEvent");
-    const createPoolCounter = new TimeCounter("CreatePool");
-    const mintPositionCounter = new TimeCounter("MintPosition");
-    const increaseLiquidityCounter = new TimeCounter("IncreaseLiquidity");
-    const decreaseLiquidityCounter = new TimeCounter("DecreaseLiquidity");
-    const liquidityChangeEventCounter = new TimeCounter("LiquidityChangeEvent");
-    const poolCreatedEventCounter = new TimeCounter("PoolCreatedEvent");
-
-    if (!placeholderInited) {
-        await ctx.store.insert(HookPlaceHolder);
-        placeholderInited = true;
-    }
-
     for (let block of blocks) {
 
         for (let inst of block.instructions) {
             if (inst.programId === RaydiumCLMMProgram && !inst.transaction?.err && inst.isCommitted) {
                 if (inst.d8 === createPool.d8) {
-                    createPoolCounter.start()
                     const params = createPool.decode(inst);
                     let token0, token1;
                     // some token metada of solana doesn't use standard layout
                     // we skip the pool for those tokens.
                     try {
                         [token0, token1] = await tokenStore.updatePrice(params.accounts.tokenMint0, params.accounts.tokenMint1, params.data.sqrtPriceX64);
-                    } catch (e: any) { console.error(`encountering exception: ${e}; skipping ${params.accounts.poolState} creation`) };
+                    } catch (e: any) { if (showSkipedPool) console.error(`encountering exception: ${e}; skipping ${params.accounts.poolState} creation`) };
 
                     if (token0 && token1) {
                         const pool = await poolStore.get(params.accounts.poolState);
@@ -233,30 +211,24 @@ run(dataSource, database, async ctx => {
                                 token0Id: token0.id,
                                 token0: token0,
                                 token1Id: token1.id,
-                                hookId: HookPlaceHolder.id,
                                 token1: token1,
                                 token0Decimals: token0.decimals,
                                 token1Decimals: token1.decimals,
+                                collectedFeesToken0: 0n,
+                                collectedFeesToken1: 0n,
                                 amount0: 0n,
                                 amount0D: '0',
                                 amount1: 0n,
                                 amount1D: '0',
-                                price0: 0,
-                                price1: 0,
                                 poolAddress: params.accounts.poolState,
                                 fee: ammConfig.tradeFeeRate,
                                 sqrtPriceX96: params.data.sqrtPriceX64,
                                 currentTick: 0,
                                 liquidity: 0n,
                                 volumeToken0: 0n,
+                                volumeToken1: 0n,
                                 volumeToken0D: '0',
                                 volumeToken1D: '0',
-                                volumeToken1: 0n,
-                                volumeUSD: 0,
-                                collectedFeesToken0: 0n,
-                                collectedFeesToken1: 0n,
-                                collectedFeesUSD: 0,
-                                tvlUSD: 0,
                                 tickSpacing: 0,
                                 batchBlockMinimumTick: 0,
                                 batchBlockMaximumTick: 0,
@@ -274,25 +246,36 @@ run(dataSource, database, async ctx => {
                             await poolStore.save(newPool);
                         }
                     }
-                    createPoolCounter.stop()
+                }
+
+                if (inst.d8 === closePosition.d8) {
+                    const params = closePosition.decode(inst);
+                    const position = await positionStore.get(params.accounts.personalPosition);
+                    if (position) {
+                        position.amount0 = 0n;
+                        position.amount1 = 0n;
+                        position.amount0D = '0';
+                        position.amount1D = '0';
+                        position.ratio = 0;
+                        await positionStore.save(position);
+                    }
                 }
 
                 if (inst.d8 === openPositionWithToken22Nft.d8 || inst.d8 === openPosition.d8 || inst.d8 === openPositionV2.d8) {
-                    mintPositionCounter.start();
-                    let poolId, ownerId, positionId: string;
+                    let poolId, ownerId, positionId, nftMint: string;
                     let tickLower, tickUpper: number;
                     let liquidity: bigint;
                     if (inst.d8 === openPositionWithToken22Nft.d8) {
                         const { accounts, data } = openPositionWithToken22Nft.decode(inst);
-                        [poolId, ownerId, positionId] = [accounts.poolState, accounts.positionNftOwner, accounts.personalPosition];
+                        [poolId, ownerId, positionId, nftMint] = [accounts.poolState, accounts.positionNftOwner, accounts.personalPosition, accounts.positionNftMint];
                         [tickLower, tickUpper, liquidity] = [data.tickLowerIndex, data.tickUpperIndex, data.liquidity];
                     } else if (inst.d8 === openPosition.d8) {
                         const { accounts, data } = openPosition.decode(inst);
-                        [poolId, ownerId, positionId] = [accounts.poolState, accounts.positionNftOwner, accounts.personalPosition];
+                        [poolId, ownerId, positionId, nftMint] = [accounts.poolState, accounts.positionNftOwner, accounts.personalPosition, accounts.positionNftMint];
                         [tickLower, tickUpper, liquidity] = [data.tickLowerIndex, data.tickUpperIndex, data.liquidity];
                     } else {
                         const { accounts, data } = openPositionV2.decode(inst);
-                        [poolId, ownerId, positionId] = [accounts.poolState, accounts.positionNftOwner, accounts.personalPosition];
+                        [poolId, ownerId, positionId, nftMint] = [accounts.poolState, accounts.positionNftOwner, accounts.personalPosition, accounts.positionNftMint];
                         [tickLower, tickUpper, liquidity] = [data.tickLowerIndex, data.tickUpperIndex, data.liquidity];
                     }
 
@@ -307,7 +290,7 @@ run(dataSource, database, async ctx => {
                             const token1 = await tokenStore.ensure(pool.token1Id);
                             const newPosition = new Position({
                                 id: positionId,
-                                nftId: 0n,
+                                nftId: nftMint,
                                 lowerTick: tickLower,
                                 upperTick: tickUpper,
                                 liquidity: liquidity,
@@ -319,7 +302,6 @@ run(dataSource, database, async ctx => {
                                 token0: token0,
                                 token1Id: pool.token1Id,
                                 token1: token1,
-                                coreTotalUSD: 0,
                                 managerId: RaydiumCLMMProgram,
                                 manager: manager,
                                 poolId: pool.id,
@@ -340,7 +322,7 @@ run(dataSource, database, async ctx => {
                                 newPosition.amount1 = event.depositAmount1;
                                 newPosition.amount1D = bigIntToDecimalStr(newPosition.amount1, token1.decimals);
                                 newPosition.ratio = calculateTokenRatio(newPosition.amount0, newPosition.amount1, pool.token0Decimals, pool.token1Decimals);
-                                newPosition.coreTotalUSD = calculateTotalPrice(token0.price, newPosition.amount0, token0.decimals) + calculateTotalPrice(token1.price, newPosition.amount1, token1.decimals);
+                                newPosition.coreTotalUSD = zeroToNull(calculateTotalPrice(token0.price, newPosition.amount0, token0.decimals) + calculateTotalPrice(token1.price, newPosition.amount1, token1.decimals));
                                 pool.liquidity += event.liquidity;
                                 pool.amount0 += event.depositAmount0;
                                 pool.amount0D = bigIntToDecimalStr(pool.amount0, token0.decimals);
@@ -353,12 +335,10 @@ run(dataSource, database, async ctx => {
                             await managerStore.incPoolCount();
                         }
                     }
-                    mintPositionCounter.stop();
                 }
 
 
                 if (inst.d8 === increaseLiquidity.d8 || inst.d8 === increaseLiquidityV2.d8) {
-                    increaseLiquidityCounter.start();
                     let poolId, positionId: string;
                     if (inst.d8 === increaseLiquidity.d8) {
                         const { accounts } = increaseLiquidity.decode(inst);
@@ -385,7 +365,7 @@ run(dataSource, database, async ctx => {
                                 position.amount1D = bigIntToDecimalStr(position.amount1, pool.token1Decimals);
                                 position.ratio = calculateTokenRatio(position.amount0, position.amount1, pool.token0Decimals, pool.token1Decimals);;
                                 pool.liquidity += event.liquidity;
-                                position.coreTotalUSD = calculateTotalPrice(token0.price, position.amount0, token0.decimals) + calculateTotalPrice(token1.price, position.amount1, token1.decimals);
+                                position.coreTotalUSD = zeroToNull(calculateTotalPrice(token0.price, position.amount0, token0.decimals) + calculateTotalPrice(token1.price, position.amount1, token1.decimals));
                                 pool.amount0 += event.amount0;
                                 pool.amount1 += event.amount1;
                                 pool.amount0D = bigIntToDecimalStr(pool.amount0, pool.token0Decimals);
@@ -395,12 +375,10 @@ run(dataSource, database, async ctx => {
                             await positionStore.save(position);
                         }
                     }
-                    increaseLiquidityCounter.stop();
                 }
 
 
                 if (inst.d8 === decreaseLiquidity.d8 || inst.d8 === decreaseLiquidityV2.d8) {
-                    decreaseLiquidityCounter.start();
                     let poolId, positionId: string;
                     if (inst.d8 === decreaseLiquidity.d8) {
                         const { accounts } = decreaseLiquidity.decode(inst);
@@ -423,7 +401,7 @@ run(dataSource, database, async ctx => {
                                 position.amount1 -= event.decreaseAmount1;
                                 position.amount0D = bigIntToDecimalStr(position.amount0, pool.token0Decimals);
                                 position.amount1D = bigIntToDecimalStr(position.amount1, pool.token1Decimals);
-                                position.coreTotalUSD = calculateTotalPrice(token0.price, position.amount0, token0.decimals) + calculateTotalPrice(token1.price, position.amount1, token1.decimals);
+                                position.coreTotalUSD = zeroToNull(calculateTotalPrice(token0.price, position.amount0, token0.decimals) + calculateTotalPrice(token1.price, position.amount1, token1.decimals));
                                 position.ratio = calculateTokenRatio(position.amount0, position.amount1, pool.token0Decimals, pool.token1Decimals);;
                                 pool.liquidity -= event.liquidity;
                                 pool.amount0 -= event.decreaseAmount0;
@@ -435,7 +413,6 @@ run(dataSource, database, async ctx => {
                             await positionStore.save(position);
                         }
                     }
-                    decreaseLiquidityCounter.stop();
                 }
             }
         }
@@ -444,7 +421,6 @@ run(dataSource, database, async ctx => {
             if (log.programId === RaydiumCLMMProgram) {
 
                 if (isEvent(PoolCreatedEvent, log)) {
-                    poolCreatedEventCounter.start();
                     const event = PoolCreatedEvent.decodeData(Buffer.from(log.message, 'base64'));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
@@ -452,11 +428,9 @@ run(dataSource, database, async ctx => {
                         pool.tickSpacing = event.tickSpacing;
                         poolStore.save(pool);
                     }
-                    poolCreatedEventCounter.stop();
                 }
 
                 if (isEvent(LiquidityChangeEvent, log)) {
-                    liquidityChangeEventCounter.start();
                     const event = LiquidityChangeEvent.decodeData(Buffer.from(log.message, 'base64'));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
@@ -471,11 +445,9 @@ run(dataSource, database, async ctx => {
                         const recordId = `${log.id}-${log.logIndex}`
                         await liquidityRecordStore.record(recordId, log.transaction!.signatures[0], pool, sender, event, log.block);
                     }
-                    liquidityChangeEventCounter.stop();
                 }
 
                 if (isEvent(SwapEvent, log)) {
-                    swapEventCounter.start();
                     const event = SwapEvent.decodeData(Buffer.from(log.message, 'base64'));
                     const pool = await poolStore.get(event.poolState);
                     if (pool) {
@@ -523,9 +495,9 @@ run(dataSource, database, async ctx => {
                         [pool.batchBlockMinimumTick, pool.batchBlockMaximumTick] = batchBlockTick.get(pool.id);
                         pool.collectedFeesToken0 += collectedFee0;
                         pool.collectedFeesToken1 += collectedFee1;
-                        pool.collectedFeesUSD = collectedAmountUSDToken0 + collectedAmountUSDToken1;
-                        pool.price0 = token0.price;
-                        pool.price1 = token1.price;
+                        pool.collectedFeesUSD = zeroToNull(collectedAmountUSDToken0 + collectedAmountUSDToken1);
+                        pool.price0 = zeroToNull(token0.price);
+                        pool.price1 = zeroToNull(token1.price);
                         pool.currentTick = event.tick;
                         pool.volumeToken0 += event.amount0;
                         pool.volumeToken1 += event.amount1;
@@ -535,28 +507,21 @@ run(dataSource, database, async ctx => {
                         pool.blockNumber = BigInt(log.block.height);
                         pool.liquidity = event.liquidity;
                         pool.sqrtPriceX96 = event.sqrtPriceX64;
-                        pool.volumeUSD += totalVolumeUSDToken0 + totalVolumeUSDToken1;
-                        pool.tvlUSD = poolAmountUSDToken0 + poolAmountUSDToken1;
+                        pool.volumeUSD = zeroToNull(pool.volumeUSD ?? 0 + totalVolumeUSDToken0 + totalVolumeUSDToken1);
+                        pool.tvlUSD = zeroToNull(poolAmountUSDToken0 + poolAmountUSDToken1);
 
-                        await managerStore.addFeeUSD(pool.fee);
+                        await managerStore.addFeeUSD(zeroToNull(collectedAmountUSDToken0 + collectedAmountUSDToken1));
                         await managerStore.addVolumeUSD(pool.volumeUSD);
                         await managerStore.incSwapCount();
                         await tokenStore.save(token);
                         await poolStore.save(pool);
+                    } else if (SOLUSDCPOOLS.has(event.poolState)) {
+                        await tokenStore.updateSOLPrice(event.sqrtPriceX64);
                     }
-                    swapEventCounter.stop();
                 }
             }
         }
     }
-
-    createPoolCounter.log();
-    mintPositionCounter.log();
-    increaseLiquidityCounter.log();
-    decreaseLiquidityCounter.log();
-    poolCreatedEventCounter.log();
-    liquidityChangeEventCounter.log();
-    swapEventCounter.log();
 
     await walletStore.flush();
     await tokenStore.flush();

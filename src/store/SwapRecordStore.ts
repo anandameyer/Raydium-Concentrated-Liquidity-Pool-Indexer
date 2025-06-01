@@ -1,7 +1,7 @@
 import { Store } from "@subsquid/typeorm-store";
 import { SwapEvent } from "../abi/generated/amm_v3/types";
 import { Pool, PoolDayData, PoolHourData, SwapReccord, Token, TokenDayData, TokenHourData, Wallet } from "../model";
-import { bigIntToDecimalStr, divideBigIntToFloat, multiplyBigIntByFloat } from "../utility";
+import { bigIntToDecimalStr, divideBigIntToFloat, multiplyBigIntByFloat, zeroToNull } from "../utility";
 import { calculateTotalPrice } from "./TokenStore";
 
 interface Block {
@@ -104,8 +104,8 @@ export class SwapRecordStore {
 
         } else {
             tokenHour.swapCount += 1n;
-            if (token.price > tokenHour.high) tokenHour.high = token.price;
-            if (token.price < tokenHour.low) tokenHour.low = token.price;
+            if (token.price ?? 0 > (tokenHour.high ?? 0)) tokenHour.high = token.price;
+            if (token.price ?? 0 < (tokenHour.low ?? 0)) tokenHour.low = token.price;
             tokenHour.close = token.price;
         }
         this.tokenHours[tokenHourId] = tokenHour;
@@ -128,8 +128,8 @@ export class SwapRecordStore {
 
         } else {
             tokenDay.swapCount += 1n;
-            if (token.price > tokenDay.high) tokenDay.high = token.price;
-            if (token.price < tokenDay.low) tokenDay.low = token.price;
+            if (token.price ?? 0 > (tokenDay.high ?? 0)) tokenDay.high = token.price;
+            if (token.price ?? 0 < (tokenDay.low ?? 0)) tokenDay.low = token.price;
             tokenDay.close = token.price;
         }
 
@@ -171,23 +171,23 @@ export class SwapRecordStore {
                 volumeToken0D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeToken1: event.amount1,
                 volumeToken1D: bigIntToDecimalStr(event.amount1, token0.decimals),
-                volumeUSD: totalVolumeUSDToken0 + totalVolumeUSDToken1,
+                volumeUSD: zeroToNull(totalVolumeUSDToken0 + totalVolumeUSDToken1),
                 volumePercentageChange: divideBigIntToFloat(event.amount0 + event.amount1, poolHourBeforeVolume > 0n ? poolHourBeforeVolume : 1n),
                 collectedFeesToken0: collectedFee0,
                 collectedFeesToken1: collectedFee1,
-                collectedFeesUSD: collectedAmountUSDToken0 + collectedAmountUSDToken1,
+                collectedFeesUSD: zeroToNull(collectedAmountUSDToken0 + collectedAmountUSDToken1),
                 swapCount: 1n,
-                open: token1.price,
-                high: token1.price,
-                low: token1.price,
-                close: token1.price,
+                open: token0.price,
+                high: token0.price,
+                low: token0.price,
+                close: token0.price,
                 chainId: 0
             });
         } else {
             poolHour.liquidity += event.liquidity;
             poolHour.sqrtPrice = event.sqrtPriceX64;
             poolHour.tick = event.tick;
-            poolHour.volumeUSD += totalVolumeUSDToken0 + totalVolumeUSDToken1;
+            poolHour.volumeUSD = zeroToNull(poolHour.volumeUSD ?? 0 + totalVolumeUSDToken0 + totalVolumeUSDToken1);
             poolHour.volumePercentageChange = divideBigIntToFloat(pool.amount0 + pool.amount1, poolHourBeforeVolume > 0n ? poolHourBeforeVolume : 1n);
             poolHour.volumeToken0 += event.amount0;
             poolHour.volumeToken1 += event.amount1;
@@ -195,11 +195,11 @@ export class SwapRecordStore {
             poolHour.volumeToken1D = bigIntToDecimalStr(poolHour.volumeToken1, token1.decimals);
             poolHour.collectedFeesToken0 += collectedFee0;
             poolHour.collectedFeesToken1 += collectedFee1;
-            poolHour.collectedFeesUSD += collectedAmountUSDToken0 + collectedAmountUSDToken1;
+            poolHour.collectedFeesUSD = zeroToNull((poolHour.collectedFeesUSD ?? 0 + collectedAmountUSDToken0 + collectedAmountUSDToken1));
             poolHour.swapCount += 1n;
             poolHour.close = token1.price;
-            if (token1.price > poolHour.high) poolHour.high = token1.price;
-            if (token1.price < poolHour.low) poolHour.low = token1.price;
+            if (token0.price ?? 0 > (poolHour.high ?? 0)) poolHour.high = token0.price;
+            if (token0.price ?? 0 < (poolHour.low ?? 0)) poolHour.low = token0.price;
         }
         this.poolHours[poolHourId] = poolHour;
 
@@ -223,23 +223,23 @@ export class SwapRecordStore {
                 volumeToken0D: bigIntToDecimalStr(event.amount0, token0.decimals),
                 volumeToken1: event.amount1,
                 volumeToken1D: bigIntToDecimalStr(event.amount0, token0.decimals),
-                volumeUSD: totalVolumeUSDToken0 + totalVolumeUSDToken1,
+                volumeUSD: zeroToNull(totalVolumeUSDToken0 + totalVolumeUSDToken1),
                 volumePercentageChange: divideBigIntToFloat(event.amount0 + event.amount1, poolDayBeforeVolume > 0n ? poolDayBeforeVolume : 1n),
                 collectedFeesToken0: collectedFee0,
                 collectedFeesToken1: collectedFee1,
-                collectedFeesUSD: collectedAmountUSDToken0 + collectedAmountUSDToken1,
+                collectedFeesUSD: zeroToNull(collectedAmountUSDToken0 + collectedAmountUSDToken1),
                 swapCount: 1n,
-                open: token1.price,
-                high: token1.price,
-                low: token1.price,
-                close: token1.price,
+                open: token0.price,
+                high: token0.price,
+                low: token0.price,
+                close: token0.price,
                 chainId: 0,
             });
         } else {
             poolDay.liquidity += event.liquidity;
             poolDay.sqrtPrice = event.sqrtPriceX64;
             poolDay.tick = event.tick;
-            poolDay.volumeUSD += totalVolumeUSDToken0 + totalVolumeUSDToken1;
+            poolDay.volumeUSD = zeroToNull((poolDay.volumeUSD ?? 0 + totalVolumeUSDToken0 + totalVolumeUSDToken1));
             poolDay.volumePercentageChange = divideBigIntToFloat(pool.amount0 + pool.amount1, poolDayBeforeVolume > 0n ? poolDayBeforeVolume : 1n);
             poolDay.volumeToken0 += event.amount0;
             poolDay.volumeToken1 += event.amount1;
@@ -247,11 +247,11 @@ export class SwapRecordStore {
             poolDay.volumeToken1D = bigIntToDecimalStr(poolHour.volumeToken1, token1.decimals);
             poolDay.collectedFeesToken0 += collectedFee0;
             poolDay.collectedFeesToken1 += collectedFee1;
-            poolDay.collectedFeesUSD += collectedAmountUSDToken0 + collectedAmountUSDToken1;
+            poolDay.collectedFeesUSD = zeroToNull(poolDay.collectedFeesUSD ?? 0 + collectedAmountUSDToken0 + collectedAmountUSDToken1);
             poolDay.swapCount += 1n;
-            if (token1.price > poolDay.high) poolDay.high = token1.price;
-            if (token1.price < poolDay.low) poolDay.low = token1.price;
-            poolDay.close = token1.price;
+            if (token0.price ?? 0 > (poolDay.high ?? 0)) poolDay.high = token0.price;
+            if (token0.price ?? 0 < (poolDay.low ?? 0)) poolDay.low = token0.price;
+            poolDay.close = token0.price;
         }
         this.poolDays[poolDayId] = poolDay;
     }

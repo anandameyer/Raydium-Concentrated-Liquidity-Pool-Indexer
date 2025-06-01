@@ -8,6 +8,15 @@ export function calculateTokenRatio(amount0: bigint, amount1: bigint, decimals0:
     return scaledAmount0 / scaledAmount1;
 }
 
+export function zeroToNull(val: number | undefined | null): number | null {
+    if (!val) return null;
+    return val
+}
+
+function isZero(a: number | undefined | null): boolean {
+    return a === 0;
+}
+
 export function bigIntToDecimalStr(value: bigint, decimals: number = 9, trimTrailingZeros: boolean = true): string {
 
     if (decimals < 0) throw new Error("Decimals cannot be negative");

@@ -15,11 +15,11 @@ export class PoolManager {
     @BigIntColumn_({nullable: false})
     swapCount!: bigint
 
-    @FloatColumn_({nullable: false})
-    totalVolumeUSD!: number
+    @FloatColumn_({nullable: true})
+    totalVolumeUSD!: number | undefined | null
 
-    @FloatColumn_({nullable: false})
-    totalFeesUSD!: number
+    @FloatColumn_({nullable: true})
+    totalFeesUSD!: number | undefined | null
 
     @StringColumn_({nullable: false})
     poolManagerAddress!: string

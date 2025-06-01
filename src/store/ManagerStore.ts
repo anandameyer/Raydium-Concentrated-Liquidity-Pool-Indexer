@@ -1,5 +1,6 @@
 import { Store } from "@subsquid/typeorm-store";
 import { Manager, PoolManager, Position } from "../model";
+import { zeroToNull } from "../utility";
 
 export class ManagerStore {
     private manager: Manager | undefined;
@@ -77,16 +78,16 @@ export class ManagerStore {
         return this.poolManager!.poolCount;
     }
 
-    async addVolumeUSD(volume: number): Promise<number> {
+    async addVolumeUSD(volume: number | undefined | null): Promise<number> {
         await this.getPoolManager();
-        this.poolManager!.totalVolumeUSD += volume;
+        this.poolManager!.totalVolumeUSD = zeroToNull(this.poolManager!.totalVolumeUSD ?? 0 + (volume ?? 0));
         this.poolManagerChanged = true;
         return this.poolManager!.poolCount;
     }
 
-    async addFeeUSD(fee: number): Promise<number> {
+    async addFeeUSD(fee: number | undefined | null): Promise<number> {
         await this.getPoolManager();
-        this.poolManager!.totalFeesUSD += fee;
+        this.poolManager!.totalFeesUSD = zeroToNull(this.poolManager!.totalFeesUSD ?? 0 + (fee ?? 0));
         this.poolManagerChanged = true;
         return this.poolManager!.poolCount;
     }

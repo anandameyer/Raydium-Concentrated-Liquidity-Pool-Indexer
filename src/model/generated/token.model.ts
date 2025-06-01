@@ -20,8 +20,8 @@ export class Token {
     @IntColumn_({nullable: false})
     decimals!: number
 
-    @FloatColumn_({nullable: false})
-    price!: number
+    @FloatColumn_({nullable: true})
+    price!: number | undefined | null
 
     @IntColumn_({nullable: false})
     poolCount!: number

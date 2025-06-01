@@ -4,10 +4,10 @@ type PoolManager @entity {
   swapCount: BigInt!
 
   # total volume all time in derived USD
-  totalVolumeUSD: Float!
+  totalVolumeUSD: Float
 
   # total swap fees all time in USD
-  totalFeesUSD: Float!
+  totalFeesUSD: Float
 
   poolManagerAddress: String!
   chainId: Int!
@@ -34,7 +34,7 @@ type Position @entity {
   id: ID!
 
   " id of the non fungible position "
-  nftId: BigInt!
+  nftId: String!
 
   " lower tick of the position "
   lowerTick: Int!
@@ -61,7 +61,7 @@ type Position @entity {
   " currency1 address "
   token1: Token
 
-  coreTotalUSD: Float!
+  coreTotalUSD: Float
 
   managerId: ID!
   manager: Manager!
@@ -92,7 +92,7 @@ type Token @entity {
 
   decimals: Int!
 
-  price: Float!
+  price: Float
 
   # number of pools containing this token
   poolCount: Int!
@@ -107,23 +107,6 @@ type Token @entity {
 
   tokenDayDatas: [TokenDayData!]! @derivedFrom(field: "token")
   tokenHourDatas: [TokenHourData!]! @derivedFrom(field: "token")
-}
-
-type Hook @entity {
-  ## Smart contract address of the token
-  id: ID!
-
-  isWhitelisted: Boolean!
-  isBlacklisted: Boolean!
-
-  chainId: Int!
-  hookAddress: String!
-
-  ## last update block
-  blockNumber: BigInt!
-
-  ## last update timestamp
-  timestamp: BigInt!
 }
 
 type Pool @entity {
@@ -150,18 +133,15 @@ type Pool @entity {
   amount1D: String!
 
   " relative price of token0"
-  price0: Float!
+  price0: Float
 
   " relative price of token1"
-  price1: Float!
+  price1: Float
 
   poolAddress: String!
 
   " pool fee tier "
   fee: Int!
-
-  hookId: ID!
-  hook: Hook!
 
   " sqrtPriceX96, used for calculations "
   sqrtPriceX96: BigInt!
@@ -177,15 +157,15 @@ type Pool @entity {
   volumeToken1: BigInt!
   volumeToken1D: String!
 
-  volumeUSD: Float!
+  volumeUSD: Float
 
   collectedFeesToken0: BigInt!
   collectedFeesToken1: BigInt!
 
   # all time fees collected derived USD
-  collectedFeesUSD: Float!
+  collectedFeesUSD: Float
 
-  tvlUSD: Float!
+  tvlUSD: Float
 
   tickSpacing: Int!
   batchBlockMinimumTick: Int!
@@ -246,7 +226,7 @@ type PoolDayData @entity {
   volumeToken1D: String!
 
   # volume in USD
-  volumeUSD: Float!
+  volumeUSD: Float
 
   # percentage change in volume USD compared to previous day
   volumePercentageChange: Float!
@@ -255,18 +235,18 @@ type PoolDayData @entity {
   collectedFeesToken1: BigInt!
 
   # all time fees collected derived USD
-  collectedFeesUSD: Float!
+  collectedFeesUSD: Float
 
   swapCount: BigInt!
 
   # opening price of token0
-  open: Float!
+  open: Float
   # high price of token0
-  high: Float!
+  high: Float
   # low price of token0
-  low: Float!
+  low: Float
   # close price of token0
-  close: Float!
+  close: Float
 
   chainId: Int!
 }
@@ -298,7 +278,7 @@ type PoolHourData @entity {
   volumeToken1D: String!
 
   # volume in USD
-  volumeUSD: Float!
+  volumeUSD: Float
 
   # percentage change in volume USD compared to previous hour
   volumePercentageChange: Float!
@@ -307,18 +287,18 @@ type PoolHourData @entity {
   collectedFeesToken1: BigInt!
 
   # all time fees collected derived USD
-  collectedFeesUSD: Float!
+  collectedFeesUSD: Float
 
   swapCount: BigInt!
 
   # opening price of token0
-  open: Float!
+  open: Float
   # high price of token0
-  high: Float!
+  high: Float
   # low price of token0
-  low: Float!
+  low: Float
   # close price of token0
-  close: Float!
+  close: Float
 
   chainId: Int!
 }
@@ -364,24 +344,6 @@ type SwapReccord @entity {
   txAtBlockNumber: BigInt!
 }
 
-type DonateReccord @entity {
-  id: ID!
-
-  poolId: String!
-  poolEntityId: ID!
-  poolEntity: Pool!
-  amount0: BigInt!
-  amount1: BigInt!
-
-  senderId: ID!
-  sender: Wallet!
-  hash: String!
-  # creation
-  txAtTimestamp: BigInt!
-  # block pool was created at
-  txAtBlockNumber: BigInt!
-}
-
 type TokenDayData @entity {
   id: ID!
   # timestamp rounded to current day by dividing by 86400
@@ -393,13 +355,13 @@ type TokenDayData @entity {
   swapCount: BigInt!
 
   # opening price USD
-  open: Float!
+  open: Float
   # high price USD
-  high: Float!
+  high: Float
   # low price USD
-  low: Float!
+  low: Float
   # close price USD
-  close: Float!
+  close: Float
 
   chainId: Int!
 }
@@ -415,13 +377,13 @@ type TokenHourData @entity {
   swapCount: BigInt!
 
   # opening price USD
-  open: Float!
+  open: Float
   # high price USD
-  high: Float!
+  high: Float
   # low price USD
-  low: Float!
+  low: Float
   # close price USD
-  close: Float!
+  close: Float
 
   chainId: Int!
 }

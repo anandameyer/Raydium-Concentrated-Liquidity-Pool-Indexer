@@ -41,8 +41,8 @@ export class PoolDayData {
     @StringColumn_({nullable: false})
     volumeToken1D!: string
 
-    @FloatColumn_({nullable: false})
-    volumeUSD!: number
+    @FloatColumn_({nullable: true})
+    volumeUSD!: number | undefined | null
 
     @FloatColumn_({nullable: false})
     volumePercentageChange!: number
@@ -53,23 +53,23 @@ export class PoolDayData {
     @BigIntColumn_({nullable: false})
     collectedFeesToken1!: bigint
 
-    @FloatColumn_({nullable: false})
-    collectedFeesUSD!: number
+    @FloatColumn_({nullable: true})
+    collectedFeesUSD!: number | undefined | null
 
     @BigIntColumn_({nullable: false})
     swapCount!: bigint
 
-    @FloatColumn_({nullable: false})
-    open!: number
+    @FloatColumn_({nullable: true})
+    open!: number | undefined | null
 
-    @FloatColumn_({nullable: false})
-    high!: number
+    @FloatColumn_({nullable: true})
+    high!: number | undefined | null
 
-    @FloatColumn_({nullable: false})
-    low!: number
+    @FloatColumn_({nullable: true})
+    low!: number | undefined | null
 
-    @FloatColumn_({nullable: false})
-    close!: number
+    @FloatColumn_({nullable: true})
+    close!: number | undefined | null
 
     @IntColumn_({nullable: false})
     chainId!: number

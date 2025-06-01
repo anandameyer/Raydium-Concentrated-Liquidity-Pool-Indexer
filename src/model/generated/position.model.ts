@@ -1,4 +1,4 @@
-import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, BigIntColumn as BigIntColumn_, IntColumn as IntColumn_, StringColumn as StringColumn_, ManyToOne as ManyToOne_, Index as Index_, FloatColumn as FloatColumn_} from "@subsquid/typeorm-store"
+import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, IntColumn as IntColumn_, BigIntColumn as BigIntColumn_, ManyToOne as ManyToOne_, Index as Index_, FloatColumn as FloatColumn_} from "@subsquid/typeorm-store"
 import {Token} from "./token.model"
 import {Manager} from "./manager.model"
 import {Pool} from "./pool.model"
@@ -19,8 +19,8 @@ export class Position {
     /**
      *  id of the non fungible position 
      */
-    @BigIntColumn_({nullable: false})
-    nftId!: bigint
+    @StringColumn_({nullable: false})
+    nftId!: string
 
     /**
      *  lower tick of the position 
@@ -78,8 +78,8 @@ export class Position {
     @ManyToOne_(() => Token, {nullable: true})
     token1!: Token | undefined | null
 
-    @FloatColumn_({nullable: false})
-    coreTotalUSD!: number
+    @FloatColumn_({nullable: true})
+    coreTotalUSD!: number | undefined | null
 
     @StringColumn_({nullable: false})
     managerId!: string

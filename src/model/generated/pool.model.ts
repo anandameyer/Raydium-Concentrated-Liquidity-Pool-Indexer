@@ -1,6 +1,5 @@
 import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, ManyToOne as ManyToOne_, Index as Index_, IntColumn as IntColumn_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_, OneToMany as OneToMany_} from "@subsquid/typeorm-store"
 import {Token} from "./token.model"
-import {Hook} from "./hook.model"
 import {Position} from "./position.model"
 import {PoolDayData} from "./poolDayData.model"
 import {PoolHourData} from "./poolHourData.model"
@@ -64,14 +63,14 @@ export class Pool {
     /**
      *  relative price of token0
      */
-    @FloatColumn_({nullable: false})
-    price0!: number
+    @FloatColumn_({nullable: true})
+    price0!: number | undefined | null
 
     /**
      *  relative price of token1
      */
-    @FloatColumn_({nullable: false})
-    price1!: number
+    @FloatColumn_({nullable: true})
+    price1!: number | undefined | null
 
     @StringColumn_({nullable: false})
     poolAddress!: string
@@ -81,13 +80,6 @@ export class Pool {
      */
     @IntColumn_({nullable: false})
     fee!: number
-
-    @StringColumn_({nullable: false})
-    hookId!: string
-
-    @Index_()
-    @ManyToOne_(() => Hook, {nullable: true})
-    hook!: Hook
 
     /**
      *  sqrtPriceX96, used for calculations 
@@ -116,8 +108,8 @@ export class Pool {
     @StringColumn_({nullable: false})
     volumeToken1D!: string
 
-    @FloatColumn_({nullable: false})
-    volumeUSD!: number
+    @FloatColumn_({nullable: true})
+    volumeUSD!: number | undefined | null
 
     @BigIntColumn_({nullable: false})
     collectedFeesToken0!: bigint
@@ -125,11 +117,11 @@ export class Pool {
     @BigIntColumn_({nullable: false})
     collectedFeesToken1!: bigint
 
-    @FloatColumn_({nullable: false})
-    collectedFeesUSD!: number
+    @FloatColumn_({nullable: true})
+    collectedFeesUSD!: number | undefined | null
 
-    @FloatColumn_({nullable: false})
-    tvlUSD!: number
+    @FloatColumn_({nullable: true})
+    tvlUSD!: number | undefined | null
 
     @IntColumn_({nullable: false})
     tickSpacing!: number
