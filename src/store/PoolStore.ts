@@ -5,29 +5,39 @@ import { ammConfigDecoder } from "../abi/amm_config";
 import { AMMConfig, Pool } from "../model";
 
 export class PoolStore {
-    private temps: Record<string, Pool> = {};
-    private ammConfigs: Record<string, AMMConfig> = {};
+    private temps?: Map<string, Pool>;
+    private ammConfigs?: Map<string, AMMConfig>;
     private readonly store: Store;
     private readonly rpcClient: Connection;
     private readonly metaplex: Metaplex;
-    constructor(store: Store, rpcClient: Connection) {
+    constructor(store: Store, rpcClient: Connection, poolStore?: Map<string, Pool>, ammStore?: Map<string, AMMConfig>) {
         this.store = store;
         this.rpcClient = rpcClient;
         this.metaplex = Metaplex.make(rpcClient);
+        if (poolStore) {
+            this.temps = poolStore;
+        } else {
+            this.temps = new Map();
+        }
+        if (ammStore) {
+            this.ammConfigs = ammStore;
+        } else {
+            this.ammConfigs = new Map();
+        }
     }
 
     async get(id: string): Promise<Pool | undefined> {
-        let pool: Pool | undefined = this.temps[id];
+        let pool: Pool | undefined = this.temps!.get(id);
         if (pool) return pool;
         pool = await this.store.findOneBy(Pool, { id });
         if (pool) {
-            this.temps[id] = pool;
+            this.temps!.set(id, pool)
             return pool;
         }
     }
 
     async fetchAMMConfig(ammConfig: string): Promise<AMMConfig> {
-        let result: AMMConfig | undefined = this.ammConfigs[ammConfig]
+        let result: AMMConfig | undefined = this.ammConfigs!.get(ammConfig)
         if (result) return result;
         result = await this.store.findOneBy(AMMConfig, { id: ammConfig });
         if (result) return result;
@@ -47,20 +57,22 @@ export class PoolStore {
                 fundFeeRate: config.fundFeeRate,
                 fundOwner: config.fundOwner.toString()
             });
-            this.ammConfigs[ammConfig] = result;
+            this.ammConfigs!.set(ammConfig, result);
             return result;
         }
         return new AMMConfig();
     }
 
     async save(pool: Pool): Promise<void> {
-        this.temps[pool.id] = pool;
+        this.temps!.set(pool.id, pool);
     }
 
     async flush(): Promise<void> {
-        this.store.upsert(Object.values(this.temps));
-        this.store.upsert(Object.values(this.ammConfigs));
-        this.temps = {};
-        this.ammConfigs = {};
+        if (this.temps) this.store.upsert([...this.temps.values()]);
+        if (this.ammConfigs) this.store.upsert([...this.ammConfigs.values()]);
+        this.temps = undefined;
+        this.ammConfigs = undefined;
+        // this.temps = {};
+        // this.ammConfigs = {};
     }
 }

@@ -165,6 +165,8 @@ const dataSource = new DataSourceBuilder()
 // For full configuration details please consult
 // https://github.com/subsquid/squid-sdk/blob/278195bd5a5ed0a9e24bfb99ee7bbb86ff94ccb3/typeorm/typeorm-config/src/config.ts#L21
 const database = new TypeormDatabase();
+const poolInMemoryStore = new Map();
+const ammConfigInMemoryStore = new Map();
 
 // Now we are ready to start data processing
 run(dataSource, database, async ctx => {
@@ -176,7 +178,7 @@ run(dataSource, database, async ctx => {
     let blocks = ctx.blocks.map(augmentBlock);
     const managerStore: ManagerStore = new ManagerStore(ctx.store, RaydiumCLMMProgram);
     const positionStore: PositionStore = new PositionStore(ctx.store);
-    const poolStore: PoolStore = new PoolStore(ctx.store, rpcClient);
+    const poolStore: PoolStore = new PoolStore(ctx.store, rpcClient, poolInMemoryStore, ammConfigInMemoryStore);
     const walletStore: WalletStore = new WalletStore(ctx.store);
     const tokenStore: TokenStore = new TokenStore(ctx.store, rpcClient, metaplex);
     const liquidityRecordStore: LiquidityRecordStore = new LiquidityRecordStore(ctx.store);
