@@ -23,7 +23,7 @@ export class PositionStore {
     }
 
     async flush(): Promise<void> {
-        this.store.upsert(Object.values(this.temps));
+        await this.store.upsert(Object.values(this.temps));
         this.temps = {};
     }
 }

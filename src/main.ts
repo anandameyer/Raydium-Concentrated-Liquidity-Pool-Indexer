@@ -428,7 +428,7 @@ run(dataSource, database, async ctx => {
                     if (pool) {
                         pool.currentTick = event.tick;
                         pool.tickSpacing = event.tickSpacing;
-                        poolStore.save(pool);
+                        await poolStore.save(pool);
                     }
                 }
 

@@ -68,8 +68,8 @@ export class PoolStore {
     }
 
     async flush(): Promise<void> {
-        if (this.temps) this.store.upsert([...this.temps.values()]);
-        if (this.ammConfigs) this.store.upsert([...this.ammConfigs.values()]);
+        if (this.temps) await this.store.upsert([...this.temps.values()]);
+        if (this.ammConfigs) await this.store.upsert([...this.ammConfigs.values()]);
         this.temps = undefined;
         this.ammConfigs = undefined;
         // this.temps = {};
