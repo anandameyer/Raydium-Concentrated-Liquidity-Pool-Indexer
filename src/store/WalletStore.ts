@@ -11,6 +11,7 @@ export class WalletStore {
     async ensure(id: string): Promise<Wallet> {
         let wallet: Wallet | undefined = this.temps[id];
         if (wallet) return wallet;
+        console.log(`Wallet store ensure cache miss on ${id}`)
         wallet = await this.store.findOneBy(Wallet, { id });
         if (wallet) {
             this.temps[id] = wallet;

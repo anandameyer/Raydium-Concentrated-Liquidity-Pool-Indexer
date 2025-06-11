@@ -11,6 +11,7 @@ export class PositionStore {
     async get(id: string): Promise<Position | undefined> {
         let position: Position | undefined = this.temps[id];
         if (position) return position;
+        console.log(`Position store cache miss on ${id}`)
         position = await this.store.findOneBy(Position, { id });
         if (position) {
             this.temps[id] = position;

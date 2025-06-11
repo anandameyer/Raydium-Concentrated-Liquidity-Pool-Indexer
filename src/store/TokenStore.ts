@@ -92,6 +92,7 @@ export class TokenStore {
         if (!price) return
         if (price < 1) console.log(price);
         if (!this.bundle) {
+            console.log(`Token store updateBundle cache miss on ${SOL}`)
             const bundle = await this.store.findOneBy(Bundle, { id: SOL });
             if (!bundle) {
                 this.bundle = new Bundle({
@@ -109,6 +110,7 @@ export class TokenStore {
 
     private async getSSOLPrice(): Promise<number> {
         if (this.bundle) return this.bundle.nativePriceUSD
+        console.log(`Token store getSSOLPrice cache miss on ${SOL}`)
         const bundle = await this.store.findOneBy(Bundle, { id: SOL });
         if (bundle) {
             this.bundle = bundle;
@@ -139,6 +141,7 @@ export class TokenStore {
     async ensure(id: string): Promise<Token> {
         let token: Token | undefined = this.temps.get(id);
         if (token) return token;
+        console.log(`Token store ensure cache miss on ${id}`)
         token = await this.store.findOneBy(Token, { id });
         if (token) {
             this.temps.set(id, token);

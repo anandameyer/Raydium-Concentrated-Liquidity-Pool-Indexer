@@ -19,6 +19,7 @@ export class ManagerStore {
 
         if (this.manager) return this.manager;
 
+        console.log(`Manager store cache miss in getManager`)
         let manager = await this.store.findOneBy(Manager, { id: this.raydiumCLMMAddress });
 
         if (manager) {
@@ -41,6 +42,7 @@ export class ManagerStore {
     async getPoolManager(): Promise<PoolManager> {
         if (this.poolManager) return this.poolManager;
 
+        console.log(`Manager store cache miss in getPoolManager`)
         let poolManager = await this.store.findOneBy(PoolManager, { id: this.raydiumCLMMAddress });
 
         if (poolManager) {

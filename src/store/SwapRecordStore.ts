@@ -24,6 +24,7 @@ export class SwapRecordStore {
     private async getTokenHour(id: string): Promise<TokenHourData | undefined> {
         let data: TokenHourData | undefined = this.tokenHours[id]
         if (data) return data;
+        console.log(`Swap record store getTokenHour cache miss on ${id}`)
         data = await this.store.findOneBy(TokenHourData, { id });
         if (data) this.tokenHours[data.id] = data;
         return data;
@@ -32,6 +33,7 @@ export class SwapRecordStore {
     private async getTokenDay(id: string): Promise<TokenDayData | undefined> {
         let data: TokenDayData | undefined = this.tokenDays[id]
         if (data) return data;
+        console.log(`Swap record store getTokenDay cache miss on ${id}`)
         data = await this.store.findOneBy(TokenDayData, { id });
         if (data) this.tokenDays[data.id] = data;
         return data;
@@ -40,6 +42,7 @@ export class SwapRecordStore {
     private async getPoolHour(id: string): Promise<PoolHourData | undefined> {
         let data: PoolHourData | undefined = this.poolHours[id]
         if (data) return data;
+        console.log(`Swap record store getPoolHour cache miss on ${id}`)
         data = await this.store.findOneBy(PoolHourData, { id });
         if (data) this.poolHours[data.id] = data;
         return data;
@@ -48,6 +51,7 @@ export class SwapRecordStore {
     private async getPoolDay(id: string): Promise<PoolDayData | undefined> {
         let data: PoolDayData | undefined = this.poolDays[id]
         if (data) return data;
+        console.log(`Swap record store getPoolHour cache miss on ${id}`)
         data = await this.store.findOneBy(PoolDayData, { id });
         if (data) this.poolDays[id] = data;
         return data;
