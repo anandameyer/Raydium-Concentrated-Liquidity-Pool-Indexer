@@ -29,6 +29,7 @@ export class PoolStore {
     async get(id: string): Promise<Pool | undefined> {
         let pool: Pool | undefined = this.temps!.get(id);
         if (pool) return pool;
+        console.log(`Pool store get cache miss on ${id}`)
         pool = await this.store.findOneBy(Pool, { id });
         if (pool) {
             this.temps!.set(id, pool)
@@ -39,6 +40,7 @@ export class PoolStore {
     async fetchAMMConfig(ammConfig: string): Promise<AMMConfig> {
         let result: AMMConfig | undefined = this.ammConfigs!.get(ammConfig)
         if (result) return result;
+        console.log(`Pool store fetchAMMConfig cache miss on ${ammConfig}`)
         result = await this.store.findOneBy(AMMConfig, { id: ammConfig });
         if (result) return result;
         const configAddress = new PublicKey(ammConfig);
