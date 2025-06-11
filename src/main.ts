@@ -22,6 +22,7 @@ const metaplex = new Metaplex(rpcClient);
 const showSkipedPool = process.env.SHOW_SKIPED_POOL === 'true';
 
 const RaydiumCLMMProgram = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK";
+const startOfBlocks = 299804550;
 
 // First we create a DataSource - component,
 // that defines where to get the data and what data should we get.
@@ -47,7 +48,7 @@ const dataSource = new DataSourceBuilder()
     // NOTE, that block ranges are specified in heights, not in slots !!!
     //
     // .setBlockRange({ from: 254_625_450 })
-    .setBlockRange({ from: 299804550 })
+    .setBlockRange({ from: startOfBlocks })
     // .setBlockRange({ from: 278_257_649 })
     // .includeAllBlocks()
 
@@ -184,9 +185,9 @@ run(dataSource, database, async ctx => {
     const liquidityRecordStore: LiquidityRecordStore = new LiquidityRecordStore(ctx.store);
     const swapRecordStore: SwapRecordStore = new SwapRecordStore(ctx.store);
     const batchBlockTick: BatchBlockTick = new BatchBlockTick();
+    await poolStore.populateCache();
 
     for (let block of blocks) {
-
         for (let inst of block.instructions) {
             if (inst.programId === RaydiumCLMMProgram && !inst.transaction?.err && inst.isCommitted) {
                 if (inst.d8 === createPool.d8) {
