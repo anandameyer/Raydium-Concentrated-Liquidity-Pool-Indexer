@@ -5,7 +5,7 @@ import { ammConfigDecoder } from "../abi/amm_config";
 import { AMMConfig, Pool } from "../model";
 
 export class PoolStore {
-    private temps?: Map<string, Pool>;
+    private temps?: Map<string, Pool | null>;
     private ammConfigs?: Map<string, AMMConfig>;
     private readonly store: Store;
     private readonly rpcClient: Connection;
@@ -27,13 +27,14 @@ export class PoolStore {
     }
 
     async get(id: string): Promise<Pool | undefined> {
-        let pool: Pool | undefined = this.temps!.get(id);
+        let pool: Pool | undefined | null = this.temps!.get(id);
         if (pool) return pool;
         pool = await this.store.findOneBy(Pool, { id });
         if (pool) {
             this.temps!.set(id, pool)
             return pool;
         }
+        this.temps!.set(id, null);
     }
 
     async fetchAMMConfig(ammConfig: string): Promise<AMMConfig> {
@@ -68,7 +69,7 @@ export class PoolStore {
     }
 
     async flush(): Promise<void> {
-        if (this.temps) await this.store.upsert([...this.temps.values()]);
+        if (this.temps) await this.store.upsert([...this.temps.values()].filter(a => a !== null));
         if (this.ammConfigs) await this.store.upsert([...this.ammConfigs.values()]);
         this.temps = undefined;
         this.ammConfigs = undefined;
