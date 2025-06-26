@@ -151,7 +151,7 @@ export class TokenStore {
     }
 
     async updateSOLPrice(sqrtPriceX64: bigint): Promise<void> {
-        const price = getPriceFromSqrtPriceX64WithStableCoin(invertSqrtPriceX64(sqrtPriceX64), USDCDecimals, SOLDecimals)
+        const price = getPriceFromSqrtPriceX64WithStableCoin(invertSqrtPriceX64(sqrtPriceX64), USDCDecimals, SOLDecimals);
         await this.updateBundle(zeroToNull(price));
         const token = await this.ensure(SOL);
         token.price = price;
@@ -163,13 +163,12 @@ export class TokenStore {
         const token1 = await this.ensure(token1Id);
         if (isStable(token0Id)) {
             if (token0.price != 1) token0.price = 1;
-            token1.price = zeroToNull(getPriceFromSqrtPriceX64WithStableCoin(sqrtPriceX64, token0.decimals, token1.decimals));
+            token1.price = zeroToNull(getPriceFromSqrtPriceX64WithStableCoin(sqrtPriceX64, token1.decimals, token0.decimals));
         }
 
         if (isStable(token1Id)) {
             if (token1.price != 1) token1.price = 1;
-            if (invertSqrtPriceX64(sqrtPriceX64) <= 0) console.log(token0Id, token1Id, sqrtPriceX64);
-            token0.price = zeroToNull(getPriceFromSqrtPriceX64WithStableCoin(invertSqrtPriceX64(sqrtPriceX64), token0.decimals, token1.decimals));
+            token0.price = zeroToNull(getPriceFromSqrtPriceX64WithStableCoin(invertSqrtPriceX64(sqrtPriceX64), token1.decimals, token0.decimals));
         }
 
         const solPrice = await this.getSSOLPrice();
